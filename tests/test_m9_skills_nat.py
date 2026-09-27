@@ -47,7 +47,8 @@ def test_validator_catches_bad_skill(tmp_path):
 
 
 def test_validate_script_runs():
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "validate_skills.py"), str(SKILLS)], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "validate_skills.py"), str(SKILLS)], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "6/6 skills valid" in r.stdout
 
@@ -58,7 +59,10 @@ def test_skill_wrapper_scripts_invoke_cli_help(name, tmp_path):
     script = SKILLS / name / "scripts" / "run.py"
     if name in ("sparkjury-clean", "sparkjury-score", "sparkjury-evalset"):
         pytest.skip("multi-command wrapper; covered by import + syntax check below")
-    r = subprocess.run([sys.executable, str(script), "--help"], capture_output=True, text=True, cwd=ROOT)
+    # encoding 钉死 UTF-8：CLI 入口已把 stdout 固定成 UTF-8（rich 帮助面板的框线字符是
+    # 多字节），Windows 上 text=True 默认 cp1252 解码会 UnicodeDecodeError 把 stdout 变 None。
+    r = subprocess.run([sys.executable, str(script), "--help"], capture_output=True, text=True, cwd=ROOT,
+                       encoding="utf-8", errors="replace")
     assert r.returncode == 0, r.stderr
     assert "Usage" in r.stdout or "usage" in r.stdout.lower()
 
