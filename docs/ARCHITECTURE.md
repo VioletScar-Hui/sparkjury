@@ -438,7 +438,7 @@ Cockpit 三栏：左 USER TASK（本轮配置），中 AGENT TIMELINE（状态�
 
 ## 16. 当前进度与验证方法
 
-M1 到 M12 已完成（M10 节点执行、M11 录制待做），122 个 pytest 用例通过。一条命令跑通全流程：
+M1 到 M12 已完成（M10 节点执行、M11 录制待做），127 个 pytest 用例通过。一条命令跑通全流程：
 
 ```
 cd sparkjury

@@ -10,6 +10,15 @@
 """
 import runpy
 import sys
+
+# Windows 控制台默认编码非 UTF-8（cp1252/GBK），本 skill 的中文输出会抛
+# UnicodeEncodeError。统一强制 UTF-8（errors=replace 保底），对 Unix 无副作用。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
 from pathlib import Path
 
 MAIN = Path(__file__).resolve().parent / "prioritize.py"
