@@ -1,0 +1,46 @@
+# label-taxonomy-map.yaml — 运行期失败标签 -> pack 类目 id 的暂行映射
+#
+# 为什么这张表在 pack 外面：standards/scenario-pack/ 已经 FROZEN，往里加一个键就会改
+# frozen_hash，tools/verify.sh 第 5 关（pack_freeze --verify）当场红。pack 层确认这张表之后，
+# 正确的归宿是 pack（taxonomy.yaml 的 master_trail_mapping / category_to_node 现在还是 TODO 占位），
+# 那要走一次 clarify/govern + 重新 freeze，不是 runtime 能自己决定的。
+#
+# 谁在用：govern 的 override_priority 要按 taxonomy_id 匹配（只写 target 的旧形状会被判 unmatched），
+# prioritize 消费 clusters.json 时也要有 category_id 才能查 fixability_boost——缺了这张表，
+# 簇会整片进 rejected_candidates，不是「悄悄不生效」而是根本不参与排序。
+#
+# 与 pack v0.2 的关系：v0.2 起 taxonomy.yaml 每个类自带 runtime_label（消费方凭它自动翻译），
+# 那是权威。本表逐行对齐 pack v0.2 的 runtime_label，只在当前的 pack v0.1 上兜底——两边不一致的话，
+# 「#10 合并前」和「合并后」同一次点击会写出不同的 taxonomy_id，黄金池的键就乱了。
+# pack 升到 v0.2 之后本表只剩 other（pack 没给 runtime_label 的那一类）还有用。
+#
+# 权威性：本表按 standards/scenario-pack/taxonomy.yaml 的 name/definition/example 逐条对齐，
+# 标 provisional 是因为它尚未被 pack owner 确认，不是因为它是猜测。
+# 多对一是预期的（F08 危险动作覆盖三种风险类失败；F04 覆盖两种「该做没做」）。
+
+meta:
+  status: "provisional — 需 pack owner（万凌）确认或改写；改本文件不需要重新 freeze"
+  version: 1
+  source_taxonomy: "standards/scenario-pack/taxonomy.yaml v0.1.0"
+  consumer: "skills-governance/sparkjury-prioritize、sparkjury-govern"
+
+# 键 = src/sparkjury/models/cluster.py 的 FailureLabel value；值 = taxonomy.yaml 的 category id
+map:
+  wrong_tool: F01              # 工具选择错误：用了不该用的工具，或该用的没用
+  wrong_args: F02              # 工具参数错误：工具选对但参数取值与任务事实不符
+  missing_lookup: F03          # 调用顺序错误：破坏依赖关系（先写后查、未验证先提交）
+  missing_confirmation: F07    # 未验证结果：写操作后无回查确认即宣告完成（对齐 pack v0.2）
+  unauthenticated_action: F08  # 危险动作：越权
+  hallucinated_info: F10       # 事实性错误：回复与工具返回/系统事实矛盾
+  loop: F06                    # 冗余与空转：重复调用、无修正的原样重试、无效等待
+  premature_stop: F12          # 执行中断：未完成即放弃（对齐 pack v0.2）
+  policy_violation: F11        # 目标偏离：完成动作但解决的不是要求的问题（对齐 pack v0.2）
+  other: F99                   # 未分类：进待分类队列由人裁决（pack v0.2 没给这一类 runtime_label）
+
+# 目前故意不映射的：
+#   F05 多余动作      —— 运行期没有对应的 FailureLabel，硬凑会把「事实性错误」误标成「多余动作」。
+#   （v0.2 已把 missing_confirmation 收到 F07、premature_stop 收到 F12、policy_violation 收到 F11，
+#    这里跟着对齐；原先按语义归到 F08/F04 的三行属于本表的旧判断，已改。）
+#   F09 上下文丢失    —— 需要多轮上下文判据，单 trace 打分给不出来。
+#   F11 目标偏离      —— 目前由 outcome 维度分数体现，没有独立标签。
+#   F12 执行中断      —— 由 trace.outcome.termination_reason 表达（超时/异常），不是失败标签。

@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from sparkjury import pack as pack_mod
 from sparkjury.cli import app
 from sparkjury.harness import EventBus, EventKind, Orchestrator, RunConfig, Stage, run_config
 from sparkjury.harness.config import InputSpec
@@ -186,3 +187,15 @@ def test_reset_db_only_deletes_inside_runs_dir(tmp_path):
                      reset_db=True, stages=[Stage.INGEST])
     Orchestrator(cfg2).run()
     assert not inside.exists() or inside.read_bytes() != b"stale"
+
+
+def test_run_records_pack_hash_and_writes_clusters_json(demo_cfg):
+    """接口 ① 的前提：run 的 manifest 要记 pack_hash；接口 ② 的产物：run 目录里要有 clusters.json。"""
+    manifest = run_config(demo_cfg)
+    assert manifest["pack_hash"] == pack_mod.frozen_hash() and manifest["pack_id"] == pack_mod.pack_id()
+    art = demo_cfg.run_dir / "clusters.json"
+    assert art.exists()
+    d = json.loads(art.read_text(encoding="utf-8"))
+    assert d["n_badcases"] == manifest["stages"]["CLUSTER"]["n_badcases"] and "badcases" not in d
+    assert d["clusters"] and d["clusters"][0]["member_trace_ids"] and d["embedder"] and d["method"]
+    assert manifest["stages"]["CLUSTER"]["clusters_file"] == str(art)

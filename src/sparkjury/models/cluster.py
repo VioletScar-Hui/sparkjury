@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -92,3 +93,15 @@ class ClusterRun(BaseModel):
     method: str
     clusters: list[Cluster] = Field(default_factory=list)
     badcases: list[BadCase] = Field(default_factory=list)
+
+
+def clusters_payload(run: ClusterRun) -> dict[str, Any]:
+    """`clusters.json` 的落盘形状：ClusterRun 去掉逐条 badcases。
+
+    badcases 留在库里（`store.list_badcases` 查得到），文件里只留计数 n_badcases 当分母——
+    落盘契约要稳定、要能被下游 skill 直接读，不是把库整表倒出来。字段与 `Cluster` 一一对应，
+    没有新发明；`GET /runs/{run_id}/clusters` 用同一个函数，保证「接口给的」和「文件里的」是同一种东西。
+    """
+    d = run.model_dump(mode="json")
+    d.pop("badcases", None)
+    return d

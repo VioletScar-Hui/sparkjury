@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class TaskChange(BaseModel):
@@ -55,6 +55,7 @@ class RegressionReport(BaseModel):
     pairwise: list[PairwiseResult] = Field(default_factory=list)
     pairwise_summary: dict[str, int] = Field(default_factory=dict)    # after/before/tie/inconsistent counts
 
+    @computed_field  # 序列化进 model_dump_json()：以前 --json 输出里没有它
     @property
     def verdict(self) -> str:
         if self.delta_pass_k is None:

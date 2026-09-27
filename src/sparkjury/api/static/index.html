@@ -156,6 +156,8 @@ h4{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .cl pre,pre.tx{background:var(--code-bg);border:1px solid var(--line-soft);border-radius:6px;padding:8px 10px;font:12.5px/1.5 var(--mono);white-space:pre-wrap;max-height:140px;overflow:auto;margin:8px 0}
 .cl .op{font-size:12.5px;color:var(--muted);padding-left:4px}
 .cl .act{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.maker{display:flex;gap:10px;align-items:center;margin:0 0 14px;font-size:13px;color:var(--muted)}
+.maker input{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;min-width:200px;color:var(--ink)}
 .btn{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:6px 14px;font-size:13px;color:var(--ink)}
 .btn:hover{border-color:var(--gold)}.btn.pri{background:var(--gold);color:#fbf9f4;border-color:transparent;font-weight:600}.btn.pri:hover{background:#96782f}
 .lnk{border:none;background:none;color:var(--gold);padding:0;font:inherit;font-size:13px;text-decoration:underline dotted;text-underline-offset:3px}.lnk:hover{color:var(--ink)}
@@ -434,19 +436,44 @@ code.cmd{display:block;background:var(--code-bg);border:1px solid var(--line-sof
     let confirmed=null;try{confirmed=await j("/runs/"+enc(id)+"/confirm");}catch(e){}
     let h=`<div class="tiles">${tiles.map(x=>`<div class="tile"><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join("")}</div>`;
     h+=`<div class="rec"><span class="tag">建议</span>${esc(c.recommendation)}</div><div class="disc">${esc(c.disclaimer)}</div>`;
+    // 拍板人：账本里的每一条决策都要能追溯到人，空着后端直接 400。存在 localStorage 里，不用每次填。
+    h+=`<div class="maker"><label for="actor">拍板人</label><input id="actor" placeholder="你的名字（必填）" value="${esc(localStorage.getItem("sj_actor")||"")}"><span id="dmsg" class="ok-msg"></span></div>`;
     for(const cl of c.clusters){
       const name=cl.cluster_id===-1?"未归类":cl.label;const sel=confirmed&&confirmed.cluster_id===cl.cluster_id;
-      h+=`<div class="cl ${sel?"sel":""}"><h3><span class="rk">#${cl.rank}</span>${esc(name)}<span class="pill">${cl.size} 条 · ${(cl.share*100).toFixed(0)}%</span><span class="pill">优先级 ${cl.priority.toFixed(1)}</span><span class="pill mut">标签来源 ${esc(cl.label_source)}</span></h3>`;
+      h+=`<div class="cl ${sel?"sel":""}"><h3><span class="rk">#${cl.rank}</span>${esc(name)}${cl.taxonomy_id?`<span class="pill mut">${esc(cl.taxonomy_id)}</span>`:""}<span class="pill">${cl.size} 条 · ${(cl.share*100).toFixed(0)}%</span><span class="pill">优先级 ${cl.priority.toFixed(1)}</span><span class="pill mut">标签来源 ${esc(cl.label_source)}</span></h3>`;
       h+=`<div class="sug">${esc(cl.suggestion)}</div>`;
       for(const r of cl.representatives.slice(0,2)){h+=`<pre><button class="lnk" data-t="${esc(r.trace_id)}">${esc(r.trace_id)}</button> · 失败维度：${esc((r.failed_dimensions||[]).map(dimZh).join("、"))||"—"}\n${esc(r.excerpt)}</pre>`;
         h+=(r.opinions||[]).slice(0,3).map(o=>`<div class="op">${esc(dimZh(o.dimension))} · ${esc(o.judge)}：${o.score}${o.label?" "+esc(LABEL_ZH[o.label]||o.label):""} — ${esc(o.rationale)}</div>`).join("");}
       h+=`<div class="act">`;
-      if(cl.cluster_id!==-1)h+=`<button class="btn ${sel?"":"pri"}" data-c="${cl.cluster_id}" ${sel?"disabled":""}>${sel?"已确认：先修这一类":"PM 确认：先修这一类"}</button>`;
+      if(cl.cluster_id!==-1){
+        h+=`<button class="btn ${sel?"":"pri"}" data-c="${cl.cluster_id}" ${sel?"disabled":""}>${sel?"已确认：先修这一类":"PM 确认：先修这一类"}</button>`;
+        h+=`<button class="btn" data-o="${cl.cluster_id}" ${cl.taxonomy_id?"":"disabled title=\"这一类没有 pack 类目映射，换类目排不出结果\""}>换这一类优先</button>`;
+        h+=`<button class="btn" data-r="${cl.cluster_id}">这一类不修</button>`;
+      }
       h+=`<button class="lnk" data-m="${cl.cluster_id}">查看 ${cl.size} 条成员 trace ›</button>${sel?`<span class="ok-msg">${esc(confirmed.next)}</span>`:""}</div>`;
       h+=`</div>`;
     }
     $("card").innerHTML=h;
-    $("card").querySelectorAll("button[data-c]").forEach(b=>b.onclick=async()=>{await j("/runs/"+enc(id)+"/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cluster_id:+b.dataset.c,decided_by:"pm"})});loadCard(id);});
+    async function decide(kind,cluster_id,rationale){
+      const actor=($("actor")?.value||"").trim();
+      if(!actor){alert("先填「拍板人」：账本里的决策必须能追溯到人");return;}
+      localStorage.setItem("sj_actor",actor);
+      $("dmsg").textContent="";
+      try{
+        const r=await j("/runs/"+enc(id)+"/decision",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({decision_kind:kind,cluster_id:cluster_id,actor:actor,rationale:rationale||""})});
+        $("dmsg").textContent=`已记账 ${r.event.event_id} → ${r.ledger}`;
+        loadCard(id);
+      }catch(e){alert("没记上："+e.message);}
+    }
+    $("card").querySelectorAll("button[data-c]").forEach(b=>b.onclick=()=>decide("accept_card",+b.dataset.c,""));
+    $("card").querySelectorAll("button[data-o]").forEach(b=>b.onclick=()=>{
+      const why=prompt("为什么这一类要先修？（可留空，会写进决策账本当理由）","");
+      if(why===null)return;decide("override_priority",+b.dataset.o,why);});
+    $("card").querySelectorAll("button[data-r]").forEach(b=>b.onclick=()=>{
+      const why=prompt("为什么这一类不修？（必填：账本不接受没有理由的否决）","");
+      if(why===null)return;if(!why.trim()){alert("要写理由：账本不接受没有理由的否决");return;}
+      decide("reject_proposal",+b.dataset.r,why);});
     $("card").querySelectorAll("button[data-t]").forEach(b=>b.onclick=()=>openTrace(b.dataset.t));
     $("card").querySelectorAll("button[data-m]").forEach(b=>b.onclick=()=>openCluster(+b.dataset.m));
   }

@@ -182,3 +182,36 @@ def test_store_and_cli(scored_db, monkeypatch):
     assert "falling back to hashing" in r.output
     r = runner.invoke(app, ["cluster", "--db", str(scored_db.parent / "none.db")])
     assert r.exit_code == 1
+
+
+def test_cli_cluster_writes_clusters_json(scored_db, tmp_path):
+    """clusters.json 是给下游（prioritize / regress 新簇检测）的文件契约：字段与 Cluster 一致，不带逐条 badcase。"""
+    out = tmp_path / "out" / "clusters.json"
+    r = runner.invoke(app, ["cluster", "--db", str(scored_db), "--min-cluster-size", "2", "--out", str(out)])
+    assert r.exit_code == 0, r.output
+    d = json.loads(out.read_text(encoding="utf-8"))
+    assert d["n_badcases"] == 5 and d["clusters"] and "badcases" not in d
+    top = d["clusters"][0]
+    assert {"cluster_id", "label", "size", "share", "severity", "priority", "label_source", "member_trace_ids",
+            "failed_dimension_counts"} <= set(top)
+    assert len(top["member_trace_ids"]) == top["size"]
+
+
+def test_category_map_prefers_pack_runtime_label(tmp_path):
+    """pack 自带 runtime_label 时用它（v0.2 起是权威），pack 没给该字段才落到兜底映射文件。"""
+    from sparkjury import pack as pack_mod
+
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+    (pack_dir / "taxonomy.yaml").write_text(
+        "meta:\n  version: 0.2.0\ncategories:\n"
+        "  - id: F06\n    name: 冗余与空转\n    runtime_label: loop\n"
+        "  - id: F01\n    name: 工具选择错误\n", encoding="utf-8")
+    pack_mod.clear_cache()
+    assert pack_mod.pack_label_map(pack_dir) == {"loop": "F06"}
+    assert pack_mod.category_for_label("loop", pack=pack_dir) == "F06"          # pack 说了算
+    # pack 没给 runtime_label 的标签，落到 standards/label-taxonomy-map.yaml
+    assert pack_mod.category_for_label("wrong_tool", pack=pack_dir) == "F01"
+    assert pack_mod.category_for_label("other", pack=pack_dir) == "F99"
+    assert pack_mod.category_for_label("no_such_label", pack=pack_dir) is None
+    pack_mod.clear_cache()
