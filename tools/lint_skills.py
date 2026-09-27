@@ -134,8 +134,10 @@ def repo_checks(root: Path) -> list:
         tracked = subprocess.run(
             ["git", "ls-files"], capture_output=True, text=True, check=True
         ).stdout.splitlines()
-    except Exception as e:  # 非 git 环境不硬失败
-        return [f"repo: git ls-files 不可用（{e}），跳过禁入路径检查"]
+    except Exception as e:  # 非 git 环境（如节点上的 tar 解包副本）不硬失败：
+        # 禁入路径检查跳过并提示，pyc 检查继续——返回空错误、打印告知。
+        print(f"    note: git ls-files 不可用（{e}），跳过禁入路径检查（pyc 检查继续）")
+        tracked = []
     for f in tracked:
         if f.endswith((".pyc", ".db")) or "__pycache__/" in f:
             errs.append(f"禁入路径被跟踪: {f}")
