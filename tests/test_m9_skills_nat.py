@@ -60,7 +60,10 @@ def test_skill_wrapper_scripts_invoke_cli_help(name, tmp_path):
     script = SKILLS / name / "scripts" / "run.py"
     if name in ("sparkjury-clean", "sparkjury-score", "sparkjury-evalset"):
         pytest.skip("multi-command wrapper; covered by import + syntax check below")
-    r = subprocess.run([sys.executable, str(script), "--help"], capture_output=True, text=True, cwd=ROOT)
+    # 治理 skill 的 --help 是中文（仓库语言约定）；Windows 的 locale 编码是 cp1252/GBK，
+    # text=True 会用它解码子进程的 UTF-8 输出直接 UnicodeDecodeError——显式 utf-8。
+    r = subprocess.run([sys.executable, str(script), "--help"], capture_output=True,
+                       encoding="utf-8", errors="replace", cwd=ROOT)
     assert r.returncode == 0, r.stderr
     assert "Usage" in r.stdout or "usage" in r.stdout.lower()
 
