@@ -236,14 +236,14 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 | M2 | Precheck 假 badcase 打标 | P0 | 已完成，10 个用例 | `sparkjury-clean`（预检那半） |
 | M3 | 三裁判面板 | P0 | 已完成，15 个用例 | `sparkjury-score` |
 | M4 | 仲裁与审计 | P0 | 已完成，10 个用例 | `sparkjury-score` |
-| M5 | badcase 聚类与优先级 | P0 | 已完成，10 个用例 | `sparkjury-cluster` |
-| M6 | 证据卡片 + 回归对比 | P0 | 已完成，9 个用例 | `sparkjury-report` + `sparkjury-regress` |
-| M7 | Harness 编排器 | P0 | 已完成，9 个用例 | 六个技能调的都是它的 CLI |
+| M5 | badcase 聚类与优先级 | P0 | 已完成，12 个用例 | `sparkjury-cluster` |
+| M6 | 证据卡片 + 回归对比 | P0 | 已完成，16 个用例 | `sparkjury-report` + `sparkjury-regress` |
+| M7 | Harness 编排器 | P0 | 已完成，10 个用例 | 六个技能调的都是它的 CLI |
 | M8 | API + Agent Cockpit | 后端 P0 / 前端 P1 | 后端与兜底页已完成，14 个用例 | 不对应：读产物、触发 run |
 | M9 | Agent Skills 打包 + NeMo Agent Toolkit | P1 | 已完成，16 个用例（3 个跳过） | 六个技能本体 |
 | M10 | DGX 部署 + τ²-bench 跑数 + 演示数据 | P0 | 脚本与 token 已完成，18 个用例；节点上执行待做 | 不对应：把环境与 trace 跑出来 |
 | M11 | README / 征文 / 视频脚本 | P0 | 初稿已完成，2 个用例；截图、真实数字、录制待补 | 不对应：文档与视频 |
-| M12 | 跨平台与仓库约定守卫 | P1 | 已完成，17 个用例 | 不对应：跨平台与仓库约定 |
+| M12 | 跨平台与仓库约定守卫 | P1 | 已完成，18 个用例 | 不对应：跨平台与仓库约定 |
 | M13 | Agent harness（模型自己调技能 + 可恢复 + 接口与权限） | P1 | 已完成，132 个用例 | 六个都是它的工具（模型自己挑） |
 
 「N 个用例」指该模块测试文件被收集到的用例数（不是通过数），有跳过的在括号里注明。
@@ -313,6 +313,7 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 - Embedding 后 HDBSCAN 聚类，min_cluster_size 为 3，噪声点归"其他"
 - 每簇取 2 到 3 条代表交 Jev Choice 贴标签：wrong_tool / wrong_args / missing_confirmation / hallucinated_info / premature_stop / policy_violation / loop
 - 优先级 = 频次 × 严重度，safety 失败乘 3，outcome 失败乘 2，其它乘 1
+- 聚类结果除写库外，还落一份 `runs/<run_id>/clusters.json`（`sparkjury cluster --out` 同款形状）：下游 skill 读文件，不必查库或拆卡片
 
 验收：50 条 badcase 聚成 3 到 8 簇，每簇有标签、代表样本、优先级分。
 
@@ -322,6 +323,8 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 - regress --before --after：pass^k 前后对比、每簇数量变化、新增与消失的簇
 - pass^k 按 τ-bench 定义：同一任务 k 次全过才算过
 - 成对比较交换顺序跑两遍
+- 对比之前先对 pack 身份：两侧 run 的 `manifest.json` 记的 `pack_hash` 不同就拒绝对比（退出码 2）——两套标准评出来的两轮不是回归
+- 门禁阈值读 pack 的 `thresholds.yaml`（主指标提升 < `delta_min` 判 FAIL、新出现的高严重簇判 FAIL），`--gate` 才把 FAIL 变成退出码 1
 
 验收：同一 db 跑两次回归差异为零；人为改坏一条 trace 后能看到变化。
 
@@ -349,9 +352,9 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 | GET | /runs/{run_id}/traces | trace 列表（支持 cluster= 与 failed= 过滤） |
 | GET | /runs/{run_id}/traces/{trace_id} | 单条 trace 与三 judge 意见 |
 | GET | /runs/{run_id}/confirm | 读取 PM 的先修选择 |
-| POST | /runs/{run_id}/confirm | 写入 PM 的先修选择，并追加 decision 事件到 governance/events.jsonl（rank 1 = accept_card，非 top = override_priority） |
-| POST | /runs/{run_id}/reject | 本轮不修（reject_proposal），同样进决策账本 |
-| GET | /runs/{run_id}/decisions | 读取该 run 的全部决策事件（看板据此渲染已决态与温度钉住） |
+| POST | /runs/{run_id}/confirm | 写入 PM 的先修选择 |
+| POST | /runs/{run_id}/decision | 卡片拍板（接受 / 换一类 / 不修）→ 写决策账本 |
+| GET | /runs/{run_id}/decisions | 本 run 已落账本的决策（看板回读：温度滑杆钉住人拍过板的簇） |
 | GET | /runs/{run_id}/regress | 回归对比 |
 | GET | /dgx | nvidia-smi 采样：显存、利用率、常驻模型 |
 | GET | /health | 健康检查，唯一免 token 的路由 |
@@ -360,6 +363,8 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 这张表由 `scripts/certificate.py` 与 `src/sparkjury/api/app.py` 里注册的路由逐条比对，多写少写都会红。
 
 请求里的路径一律先归位再用，越界报 400：`run_id` 只能是单层目录名（`RunManager.run_dir()` 是所有读写的公共出口），`db` 必须落在 `runs_dir` 之内（否则 `reset_db` 的 `unlink()` 会作用到宿主机上任意一个文件），`config_path` 必须落在服务进程工作目录之内。没配 token 时只服务回环来的请求；`sparkjury serve` 绑公网又不给 token 会直接拒绝启动，`deploy/dgx/start_judges.sh` 在起 tmux 之前就把这种情况拦掉。
+
+卡片上的动作是决策事件的生产端：`POST /runs/{run_id}/decision` 收 `accept_card / override_priority / reject_proposal`，写 append-only 的 `governance/events.jsonl`（`contracts/event-ledger.schema.json` 的形状）。`override_priority` 必须带 `taxonomy_id`（pack 类目 id）和 `to_rank`，缺了会被治理层判 unmatched、排序不会变，所以服务端直接拒掉。簇标签到类目的映射优先读 pack 的 `taxonomy.yaml`（v0.2 起每个类自带 `runtime_label`），pack 还没有该字段时兜底用 `standards/label-taxonomy-map.yaml`（pack 已冻结，兜底表只能放在 pack 之外）；响应里的每个簇会带一个 `taxonomy_id`，落盘文件不加字段。
 
 Cockpit 三栏：左 USER TASK（本轮配置），中 AGENT TIMELINE（状态机进度与每条 trace 流水），右 DGX SPARK（模型显存、GPU 利用率、本地与云端调用计数）。底部 FINAL ARTIFACT 是证据卡片。
 
@@ -508,7 +513,7 @@ durable 那一段：
 
 ## 17. 当前进度与验证方法
 
-M1 到 M13 已完成（M10 节点执行、M11 录制待做），269 个 pytest 用例通过。一条命令跑通全流程：
+M1 到 M13 已完成（M10 节点执行、M11 录制待做），280 个 pytest 用例通过。一条命令跑通全流程：
 
 ```
 cd sparkjury

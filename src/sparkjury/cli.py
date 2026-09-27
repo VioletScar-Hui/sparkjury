@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import typer
@@ -15,15 +14,6 @@ from sparkjury.agent.cli import agent_app
 from sparkjury.adapters import load as load_traces
 from sparkjury.models.trace import TraceSource
 from sparkjury.store import TraceStore
-
-# Windows 管道下 stdout 默认 cp1252，gates 等含中文的输出会 UnicodeEncodeError 把子进程
-# 打成 rc=1（技能封装/证书按 rc 判死活）。与 skills 封装脚本同一处理：固定 UTF-8。
-for _s in (sys.stdout, sys.stderr):
-    if hasattr(_s, "reconfigure"):
-        try:
-            _s.reconfigure(encoding="utf-8", errors="replace")
-        except (ValueError, OSError):
-            pass
 
 app = typer.Typer(help="SparkJury: agent evaluation harness for DGX Spark.", no_args_is_help=True)
 
@@ -306,12 +296,13 @@ def cluster(
     method: str = typer.Option("auto", "--method", help="auto | hdbscan | threshold"),
     min_cluster_size: int = typer.Option(3, "--min-cluster-size"),
     jev: str = typer.Option("auto", "--jev", help="auto (label clusters with Jev if TYPESAFE_API_KEY set) | off"),
+    out: Path | None = typer.Option(None, "--out", help="also write clusters.json here (a run writes runs/<run_id>/clusters.json in its CLUSTER stage)"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """Select badcases, cluster them, label each cluster, rank by frequency x severity (M5)."""
     from sparkjury.arbiter import JevClient
     from sparkjury.cluster import HashingEmbedder, OpenAIEmbedder, build_badcase, cluster_badcases, label_clusters
-    from sparkjury.models.cluster import ClusterRun
+    from sparkjury.models.cluster import ClusterRun, clusters_payload
 
     emb = HashingEmbedder() if embedder == "hash" else OpenAIEmbedder(embed_base_url, embed_model)
     with TraceStore(db) as store:
@@ -349,6 +340,11 @@ def cluster(
         )
         store.put_cluster_run(run)
 
+    if out:
+        # clusters.json 的落盘形状由 clusters_payload 一处定义：run 的 CLUSTER 阶段和这里写的是同一种东西。
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(clusters_payload(run), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        err_console.print(f"  wrote {out}")
     if as_json:
         console.print_json(run.model_dump_json())
         return
@@ -398,11 +394,21 @@ def regress(
     out: Path | None = typer.Option(None, "--out", help="write the markdown report here"),
     pairwise: str | None = typer.Option(None, "--pairwise", help="'mock' or a panel TOML; judges before/after pairs with order swap"),
     as_json: bool = typer.Option(False, "--json"),
-    gates: bool = typer.Option(True, "--gates/--no-gates", help="regression gates: same pack hash, min pass^k delta, no new severe cluster"),
-    delta_min: float = typer.Option(0.02, "--delta-min", help="min pass^k improvement to PASS (governed by pack thresholds.regress)"),
+    gate: bool = typer.Option(False, "--gate", help="exit 1 when a gate FAILs; without it gates are reported but the exit code stays 0"),
+    severe_min: float | None = typer.Option(None, "--severe-min", help="override the pack new-severe-cluster severity threshold"),
+    delta_min: float | None = typer.Option(None, "--delta-min", help="override the pack delta_min"),
+    pack: Path | None = typer.Option(None, "--pack", help="another scenario pack dir (default standards/scenario-pack)"),
 ) -> None:
-    """Compare two evaluation stores (M6): pass^k before/after, tasks fixed or broken, cluster shifts."""
-    from sparkjury.regress import compare, render_markdown
+    """Compare two evaluation stores (M6): pass^k before/after, tasks fixed or broken, cluster shifts.
+
+    Pack identity is checked before the comparison: if the two sides recorded different pack_hash values the
+    command refuses to compare (exit code 2) - two rounds under different standards are not a regression.
+    Gates (primary-metric delta_min, new severe clusters) are printed with the report; only --gate turns a
+    FAIL into exit code 1.
+    """
+    # 中文说明放注释里而不是 docstring 里：docstring 会进 --help，而 Windows 的控制台是 cp1252，
+    # 帮助文本里有非 ASCII 就会 UnicodeEncodeError（六技能把 CLI 当子进程调，跑得到这条路径）。
+    from sparkjury.regress import REFUSED_EXIT, compare, evaluate_gates, render_gates, render_markdown
 
     judge = None
     if pairwise == "mock":
@@ -417,52 +423,44 @@ def regress(
 
         spec = PanelConfig.from_toml(pairwise).judges[0]
         judge = OpenAIPairwiseJudge(spec.name, spec.model, spec.base_url or "", os.environ.get(spec.api_key_env) if spec.api_key_env else None, timeout_s=spec.timeout_s)
-    r = compare(before, after, pairwise=judge, before_label=before.name, after_label=after.name)
-    gate_result = None
-    if gates:
-        from sparkjury.regress.passk import compute_gates
-        from sparkjury.store.sqlite import TraceStore as _TS
 
-        def _manifest_of(db: Path):
-            mp = db.resolve().parent / "manifest.json"
-            try:
-                return json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else None
-            except (json.JSONDecodeError, OSError):
-                return None
-        with _TS(after) as _s:
-            _crun = _s.get_cluster_run()
-        sev = {c.label.value: c.severity for c in (_crun.clusters if _crun else [])}
-        gate_result = compute_gates(_manifest_of(before), _manifest_of(after), r,
-                                    delta_min=delta_min, after_severities=sev)
+    ident = evaluate_gates(None, before_db=before, after_db=after, pack=pack, severe_min=severe_min, delta_min=delta_min)
+    if ident.exit_code == REFUSED_EXIT:
+        reason = ident.failures[0].detail if ident.failures else "pack identity mismatch"
+        if as_json:
+            console.print_json(json.dumps(ident.model_dump(mode="json"), ensure_ascii=False))
+        else:
+            err_console.print(f"[red]regress refused[/] {reason}")
+            err_console.print(render_gates(ident, prefix="  "), markup=False, highlight=False)
+        raise typer.Exit(code=REFUSED_EXIT)
+
+    r = compare(before, after, pairwise=judge, before_label=before.name, after_label=after.name)
+    g = evaluate_gates(r, before_db=before, after_db=after, pack=pack, severe_min=severe_min, delta_min=delta_min,
+                       pack_hash_before=ident.pack_hash_before, pack_hash_after=ident.pack_hash_after)
     md = render_markdown(r)
-    if gate_result:
-        md += "\n\n## Gates: " + gate_result["verdict"] + "\n" + "\n".join(
-            f"- [{c['status']}] {c['gate']}: {c['detail']}" for c in gate_result["checks"]) + "\n"
-    if as_json:
-        payload = json.loads(r.model_dump_json())
-        payload["verdict"] = r.verdict          # property 不进 model_dump，旧疣顺手修
-        if gate_result:
-            payload["gates"] = gate_result
-        console.print_json(json.dumps(payload, ensure_ascii=False))
-        if out:                                  # 旧疣：--json 曾静默跳过 --out
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(md, encoding="utf-8")
-        return
-    console.print(f"[green]regression[/] {r.verdict}: pass^{r.k} {_pct(r.pass_k_before)} -> {_pct(r.pass_k_after)} "
-                  f"({'-' if r.delta_pass_k is None else f'{r.delta_pass_k * 100:+.1f} pp'}); "
-                  f"fixed {len(r.fixed_tasks)}, broken {len(r.broken_tasks)}; badcases {r.n_badcases_before} -> {r.n_badcases_after}")
-    if gate_result:
-        color = "green" if gate_result["verdict"] == "PASS" else "red"
-        console.print(f"[{color}]gates {gate_result['verdict']}[/]: " + "; ".join(
-            f"{c['gate']}={c['status']}" for c in gate_result["checks"]))
-    if r.pairwise_summary:
-        console.print("  pairwise: " + ", ".join(f"{k}={v}" for k, v in sorted(r.pairwise_summary.items())))
-    if out:
+    if out:  # 先落文件再说输出格式：以前 --json 提前 return，--out 被静默跳过
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(md, encoding="utf-8")
-        console.print(f"  wrote {out}")
+    if as_json:
+        payload = json.loads(r.model_dump_json())
+        payload["gates"] = g.model_dump(mode="json")
+        console.print_json(json.dumps(payload, ensure_ascii=False))
     else:
-        console.print(md, markup=False, highlight=False)
+        console.print(f"[green]regression[/] {r.verdict}: pass^{r.k} {_pct(r.pass_k_before)} -> {_pct(r.pass_k_after)} "
+                      f"({'-' if r.delta_pass_k is None else f'{r.delta_pass_k * 100:+.1f} pp'}); "
+                      f"fixed {len(r.fixed_tasks)}, broken {len(r.broken_tasks)}; badcases {r.n_badcases_before} -> {r.n_badcases_after}")
+        if r.pairwise_summary:
+            console.print("  pairwise: " + ", ".join(f"{k}={v}" for k, v in sorted(r.pairwise_summary.items())))
+        if g.verdict == "FAIL":
+            err_console.print(f"[red]{render_gates(g)}[/]", highlight=False)
+        else:
+            console.print(render_gates(g), markup=False, highlight=False)
+        if out:
+            console.print(f"  wrote {out}")
+        else:
+            console.print(md, markup=False, highlight=False)
+    if gate and g.verdict != "PASS":
+        raise typer.Exit(code=g.exit_code)
 
 
 @app.command()

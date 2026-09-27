@@ -301,3 +301,38 @@ def test_gen_skills_refuses_args_instead_of_regenerating():
     assert mod.main(["--dry-run"]) == 2, "不认识的参数应当返回非零"
     assert snapshot() == before, "带参数调用不该重新生成技能"
 
+
+
+SKILL_COMMANDS = ("ingest", "precheck", "score", "arbitrate", "cluster", "report", "regress", "run")
+
+
+def _non_ascii(text: str) -> str:
+    return "".join(sorted({c for c in text if ord(c) > 127}))
+
+
+def test_cli_help_text_of_skill_commands_is_ascii_for_windows_consoles():
+    """Windows CI 的控制台是 cp1252：--help 也走同一个控制台，帮助文本里有非 ASCII 就 UnicodeEncodeError。
+
+    六技能封装把 CLI 当子进程调，`sparkjury cluster --help` 就是这么红的：新加的两个选项写了中文 help。
+    （rich 的边框字符不用管：真 Windows 控制台上它自己会换成 ASCII 边框，出问题的是帮助文本本身。）
+    这里把六个技能用到的子命令一次钉住——再加中文 help / 中文 docstring 就在本地红，不用等 Windows。
+    """
+    import click
+    import typer.main
+
+    from sparkjury.cli import app as cli_app
+
+    group = typer.main.get_command(cli_app)
+    assert group.commands.keys() >= set(SKILL_COMMANDS)
+    bad = []
+    for name in SKILL_COMMANDS:
+        cmd = group.commands[name]
+        texts = [("docstring", cmd.help or "")]
+        ctx = click.Context(cmd)
+        for prm in cmd.get_params(ctx):
+            texts.append((f"option {prm.name}", getattr(prm, "help", None) or ""))
+        for where, text in texts:
+            chars = _non_ascii(text)
+            if chars:
+                bad.append(f"{name} 的 {where} 里有非 ASCII: {chars!r}")
+    assert bad == [], "帮助文本要能用 cp1252 编码（Windows 控制台）：" + "; ".join(bad)

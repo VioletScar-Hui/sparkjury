@@ -9,13 +9,15 @@ from fastapi.testclient import TestClient
 from sparkjury.api import create_app
 from sparkjury.api import dgx as dgx_mod
 from sparkjury.api.runs import InvalidRunId, RunManager, resolve_within
+from sparkjury.governance import validate_event
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     monkeypatch.chdir(tmp_path)
-    app = create_app(tmp_path / "runs", probe_endpoints=False)
+    # 决策账本落到 tmp：默认路径是仓库根的 governance/events.jsonl，测试不该往仓库里写
+    app = create_app(tmp_path / "runs", probe_endpoints=False, ledger_path=tmp_path / "governance" / "events.jsonl")
     with TestClient(app) as c:
         yield c
 
@@ -74,6 +76,8 @@ def test_start_demo_run_and_read_everything(client):
     assert client.get("/runs/api-1/confirm").json() is None
     c = client.post("/runs/api-1/confirm", json={"cluster_id": top, "note": "start here"}).json()
     assert c["cluster_id"] == top and "sparkjury regress" in c["next"]
+    # 同一个按钮的两种入口都要落账本：老端点也得写一条 accept_card，否则点了确认账本里是空的
+    assert c["event"]["payload"]["decision_kind"] == "accept_card" and c["event"]["payload"]["target"] == f"card:{top}"
     assert client.get("/runs/api-1/confirm").json()["note"] == "start here"
     assert client.post("/runs/api-1/confirm", json={"cluster_id": 999}).status_code == 404
 
@@ -239,52 +243,59 @@ def test_app_without_token_refuses_non_loopback_clients(tmp_path, monkeypatch):
         assert c.get("/runs?token=t").status_code == 200
 
 
-# ---- 接口③：拍板进决策账本（黄金池入口）--------------------------------------------
-#
-# confirm 此前只写 confirm.json（死胡同）。现在每次拍板同时追加 governance/events.jsonl
-# 的 decision 事件：点 rank 1 = accept_card；点非 top = override_priority（带 card-spec
-# §8.1 四字段）；"本轮不修" = reject_proposal。消费方是治理层（prioritize override hook、
-# govern 投影、calibrate 可靠性真值）。client fixture 已 chdir 到 tmp_path，账本落在
-# tmp_path/governance/，不污染仓库。
+# ---- 决策事件生产端（PR 接口 ③） ---------------------------------------------------------
 
-def test_confirm_appends_decision_event_to_governance_ledger(client, tmp_path):
+def test_decision_endpoint_writes_a_governance_ledger(client, tmp_path):
     client.post("/runs", json={"demo": True, "run_id": "dec-1"})
     _wait(client, "dec-1")
-    card = client.get("/runs/dec-1/card").json()
-    top = next(c for c in card["clusters"] if c["rank"] == 1)
-    other = next((c for c in card["clusters"] if c["rank"] and c["rank"] != 1 and c["cluster_id"] != -1), None)
+    cls = client.get("/runs/dec-1/clusters").json()["clusters"]
+    top, other = cls[0], cls[-1]
+    assert re.match(r"^F\d\d$", top["taxonomy_id"])       # 响应里带 pack 类目：看板发 override 要用
 
-    r = client.post("/runs/dec-1/confirm", json={"cluster_id": top["cluster_id"], "decided_by": "pm", "note": "先修它"})
-    assert r.status_code == 200
-    ev = r.json()["decision_event"]
-    assert ev["payload"]["decision_kind"] == "accept_card"
-    assert ev["payload"]["taxonomy_id"] == top["label"]
+    # actor 必填：账本里的决策必须能追溯到人
+    assert client.post("/runs/dec-1/decision", json={"decision_kind": "accept_card", "cluster_id": top["cluster_id"]}).status_code == 400
+    # 未归类（cluster_id = -1）不是可拍板的对象
+    assert client.post("/runs/dec-1/decision", json={"decision_kind": "accept_card", "cluster_id": -1, "actor": "pm-li"}).status_code == 404
+    # pack 层动作不走这个端点
+    assert client.post("/runs/dec-1/decision", json={"decision_kind": "thaw_pack", "cluster_id": top["cluster_id"], "actor": "pm-li"}).status_code == 400
 
-    if other is not None:
-        ev2 = client.post("/runs/dec-1/confirm", json={"cluster_id": other["cluster_id"], "decided_by": "pm"}).json()["decision_event"]
-        p = ev2["payload"]
-        # 非 top = 人工改序，四字段必须齐（缺字段会被消费方判 unmatched——宁可显式没用不可静默）
-        assert p["decision_kind"] == "override_priority"
-        assert p["taxonomy_id"] == other["label"] and p["to_rank"] == 1
-        assert p["system_top"] == top["label"] and p["human_top"] == other["label"]
+    r = client.post("/runs/dec-1/decision", json={"decision_kind": "accept_card", "cluster_id": top["cluster_id"], "actor": "pm-li"})
+    assert r.status_code == 201
+    assert r.json()["confirm"]["cluster_id"] == top["cluster_id"]
+    assert r.json()["event"]["payload"]["target"] == f"card:{top['cluster_id']}"
 
-    ledger = tmp_path / "governance" / "events.jsonl"
-    assert ledger.exists()
-    lines = [json.loads(x) for x in ledger.read_text(encoding="utf-8").splitlines() if x.strip()]
-    assert all(e["event_type"] == "decision" for e in lines)
+    # 换一类：必须带 taxonomy_id（匹配键）+ to_rank + system_top/human_top（校准投影用）
+    r = client.post("/runs/dec-1/decision", json={"decision_kind": "override_priority", "cluster_id": other["cluster_id"],
+                                                 "actor": "pm-li", "rationale": "先修这一类"})
+    assert r.status_code == 201, r.text
+    payload = r.json()["event"]["payload"]
+    assert payload["taxonomy_id"] == other["taxonomy_id"] == payload["human_top"] != payload["system_top"]
+    assert payload["to_rank"] == 1 and payload["target"] == f"priority:{other['taxonomy_id']}"
+    # 选的还是系统给的第一名 -> 没有换类目，拒掉（否则会写进一条没有意义的 override）
+    assert client.post("/runs/dec-1/decision", json={"decision_kind": "override_priority", "cluster_id": top["cluster_id"],
+                                                     "actor": "pm-li"}).status_code == 400
+    # 不修：账本不接受没有理由的否决
+    assert client.post("/runs/dec-1/decision", json={"decision_kind": "reject_proposal", "cluster_id": other["cluster_id"],
+                                                     "actor": "pm-li"}).status_code == 400
+    assert client.post("/runs/dec-1/decision", json={"decision_kind": "reject_proposal", "cluster_id": other["cluster_id"],
+                                                     "actor": "pm-li", "rationale": "成本高于收益"}).status_code == 201
 
-    listed = client.get("/runs/dec-1/decisions").json()
-    assert len(listed) == len(lines) and listed[0]["payload"]["decision_kind"] == "accept_card"
+    lines = [json.loads(x) for x in (tmp_path / "governance" / "events.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
+    assert [e["event_id"] for e in lines] == ["evt-0001", "evt-0002", "evt-0003"]
+    assert all(e["run_id"] == "dec-1" and e["skill"] == "report" for e in lines)
+    for e in lines:
+        validate_event(e)  # 消费端（PR#10 govern 的 _ledger.py）同一套规矩：target 必须带命名空间前缀
 
 
-def test_reject_records_irreversible_decision(client, tmp_path):
-    client.post("/runs", json={"demo": True, "run_id": "dec-2"})
-    _wait(client, "dec-2")
-    r = client.post("/runs/dec-2/reject", json={"note": "赛前冻结，不动 prompt", "decided_by": "pm"})
-    assert r.status_code == 200
-    ev = r.json()["decision_event"]
-    assert ev["payload"]["decision_kind"] == "reject_proposal"
-    assert ev["payload"]["rationale"] == "赛前冻结，不动 prompt"
-    # 不可逆决策必须可回读——前端靠它把"本轮不修"置灰并让温度滑杆永不吞掉已决簇
-    kinds = [e["payload"]["decision_kind"] for e in client.get("/runs/dec-2/decisions").json()]
-    assert "reject_proposal" in kinds
+def test_decisions_readback_only_returns_this_runs_events(client):
+    """看板回读：温度滑杆要钉住人拍过板的簇，靠 GET /decisions 拿本 run 的账本条目。"""
+    for rid in ("rb-1", "rb-2"):
+        client.post("/runs", json={"demo": True, "run_id": rid})
+        _wait(client, rid)
+        top = client.get(f"/runs/{rid}/clusters").json()["clusters"][0]
+        assert client.post(f"/runs/{rid}/decision", json={"decision_kind": "accept_card", "cluster_id": top["cluster_id"],
+                                                          "actor": "pm-li"}).status_code == 201
+    d = client.get("/runs/rb-1/decisions").json()
+    assert d["n"] == 1 and d["decisions"][0]["run_id"] == "rb-1"          # rb-2 的不掺进来
+    assert d["decisions"][0]["payload"]["cluster_id"] is not None         # 前端钉住簇靠这个字段
+    assert client.get("/runs/no-such/decisions").status_code == 404

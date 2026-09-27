@@ -156,6 +156,8 @@ h4{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .cl pre,pre.tx{background:var(--code-bg);border:1px solid var(--line-soft);border-radius:6px;padding:8px 10px;font:12.5px/1.5 var(--mono);white-space:pre-wrap;max-height:140px;overflow:auto;margin:8px 0}
 .cl .op{font-size:12.5px;color:var(--muted);padding-left:4px}
 .cl .act{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.maker{display:flex;gap:10px;align-items:center;margin:0 0 14px;font-size:13px;color:var(--muted)}
+.maker input{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;min-width:200px;color:var(--ink)}
 .btn{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:6px 14px;font-size:13px;color:var(--ink)}
 .btn:hover{border-color:var(--gold)}.btn.pri{background:var(--gold);color:#fbf9f4;border-color:transparent;font-weight:600}.btn.pri:hover{background:#96782f}
 .lnk{border:none;background:none;color:var(--gold);padding:0;font:inherit;font-size:13px;text-decoration:underline dotted;text-underline-offset:3px}.lnk:hover{color:var(--ink)}
@@ -428,53 +430,75 @@ code.cmd{display:block;background:var(--code-bg);border:1px solid var(--line-sof
   async function loadCard(id){
     let c;try{c=await j("/runs/"+enc(id)+"/card");}catch(e){$("card").innerHTML=`<div class="empty">还没有卡片（${esc(e.message)}）</div>`;return;}
     const t=c.totals,q=c.quality;
-    const tiles=[[t.n_traces,"条 trace"],[t.n_env_failures,"环境失败"],[t.n_badcases,"badcase"],[t.n_clusters,"个簇"],[pct(q.pass_rate),"单次成功率"]];
-    // pass 区间：pass@k=至少一次（能力上限），pass^k=全部成功（可靠性下限，组合估计）。
-    // 区间宽度=稳定性缺口——近一半"成功"靠运气时这里会很宽。旧前缀口径 pass_k 不再上砖。
-    const comb=q.pass_k_comb||{},atk=q.pass_at_k||{};const K=Object.keys(comb).map(Number).sort((a,b)=>b-a)[0];
-    if(K>1){tiles.push([pct(atk[K]),"pass@"+K+" 上限"],[pct(comb[K]),"pass^"+K+" 下限"],
-      [pct(Math.max(0,(atk[K]||0)-(comb[K]||0))),"稳定性缺口"]);}
-    else if(q.pass_k&&q.pass_k[3]!==undefined)tiles.push([pct(q.pass_k[3]),"pass^3"]);
+    const tiles=[[t.n_traces,"条 trace"],[t.n_env_failures,"环境失败"],[t.n_badcases,"badcase"],[t.n_clusters,"个簇"],[pct(q.pass_rate),"pass^1"]];
+    for(const k in (q.pass_k||{}))if(+k>1)tiles.push([pct(q.pass_k[k]),"pass^"+k]);
+    // pass 区间砖：pass@k = 能力上限（k 次里至少一次），pass^k 组合估计 = 可靠性下限，差值 = 稳定性缺口
+    {const ks=Object.keys(q.pass_k_comb||{}).map(Number).filter(k=>k>1);
+     if(ks.length){const k=Math.max(...ks),lo=q.pass_k_comb[k],hi=(q.pass_at_k||{})[k];
+       if(hi!=null)tiles.push([pct(hi),"pass@"+k+" 上限"]);
+       if(lo!=null)tiles.push([pct(lo),"pass^"+k+" 下限"]);
+       if(hi!=null&&lo!=null)tiles.push([((hi-lo)*100).toFixed(1)+" pp","稳定性缺口"]);}}
     tiles.push([pct(q.judge_agreement_rate),"裁判一致率"],[q.n_degraded,"降级"]);
     let confirmed=null;try{confirmed=await j("/runs/"+enc(id)+"/confirm");}catch(e){}
-    let decisions=[];try{decisions=await j("/runs/"+enc(id)+"/decisions");}catch(e){}
-    const decidedClusters=new Set(decisions.map(d=>(d.payload&&d.payload.target||"").startsWith("cluster:")?+(d.payload.target.split(":")[1]):null).filter(x=>x!==null));
-    const rejected=decisions.some(d=>d.payload&&d.payload.decision_kind==="reject_proposal");
+    // 人拍过板的簇：任何温度档都必须显示（抑制≠删除，人类决策优先于呈现层过滤）
+    const decided=new Set();
+    try{const dd=await j("/runs/"+enc(id)+"/decisions");
+        for(const e of dd.decisions||[]){const cid=(e.payload||{}).cluster_id;if(cid!=null)decided.add(+cid);}}catch(e){}
     let h=`<div class="tiles">${tiles.map(x=>`<div class="tile"><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join("")}</div>`;
     h+=`<div class="rec"><span class="tag">建议</span>${esc(c.recommendation)}</div><div class="disc">${esc(c.disclaimer)}</div>`;
-    // 温度滑杆（呈现层）：低温只看重点修的，高温全量。人拍过板的簇无视温度永远显示——
-    // 不可逆决策不被滑杆吞掉。档位语义与治理层 focus 一致（p0=1 / standard=3 / full=全部）。
-    const savedT=+(localStorage.getItem("sparkjury_temp")||"0.7");
-    h+=`<div class="act" style="align-items:center;gap:10px;margin:10px 0">
-      <span class="pill mut">温度</span>
-      <input id="tempSlider" type="range" min="0" max="1" step="0.05" value="${savedT}" style="flex:1;max-width:220px">
-      <span id="tempLabel" class="pill"></span>
-      <span style="flex:1"></span>
-      <button id="btnReject" class="btn" ${rejected?"disabled":""}>${rejected?"已记录：本轮不修":"本轮不修"}</button>
-    </div><div id="tempNote" class="disc" style="display:none"></div>`;
+    h+=`<div class="bar-row"><label for="tempSlider">呈现层温度</label> <input type="range" id="tempSlider" min="0" max="1" step="0.05" value="${esc(localStorage.getItem("sj_temp")||"1")}" style="vertical-align:middle;width:180px"> <span id="tempLabel"></span> <span id="tempNote" class="ok-msg"></span></div>`;
+    // 拍板人：账本里的每一条决策都要能追溯到人，空着后端直接 400。存在 localStorage 里，不用每次填。
+    h+=`<div class="maker"><label for="actor">拍板人</label><input id="actor" placeholder="你的名字（必填）" value="${esc(localStorage.getItem("sj_actor")||"")}"><span id="dmsg" class="ok-msg"></span></div>`;
     for(const cl of c.clusters){
-      const name=cl.cluster_id===-1?"未归类":cl.label;const sel=(confirmed&&confirmed.cluster_id===cl.cluster_id)||decidedClusters.has(cl.cluster_id);
-      const confPill=cl.label_confidence!=null?`<span class="pill mut" title="标签置信度是选项间相对偏好，不是正确率——决策模型的通病，如实标注">标签置信 ${(cl.label_confidence*100).toFixed(0)}%（≠正确率）</span>`:"";
-      h+=`<div class="cl ${sel?"sel":""}" data-rank="${cl.rank||99}" data-decided="${sel?1:0}"><h3><span class="rk">#${cl.rank}</span>${esc(name)}<span class="pill">${cl.size} 条 · ${(cl.share*100).toFixed(0)}%</span><span class="pill">优先级 ${cl.priority.toFixed(1)}</span><span class="pill mut">标签来源 ${esc(cl.label_source)}</span>${confPill}</h3>`;
+      const name=cl.cluster_id===-1?"未归类":cl.label;const sel=confirmed&&confirmed.cluster_id===cl.cluster_id;
+      const dec=decided.has(+cl.cluster_id);
+      h+=`<div class="cl ${sel?"sel":""}" data-rank="${cl.rank}" data-decided="${dec?1:0}"><h3><span class="rk">#${cl.rank}</span>${esc(name)}${cl.taxonomy_id?`<span class="pill mut">${esc(cl.taxonomy_id)}</span>`:""}<span class="pill">${cl.size} 条 · ${(cl.share*100).toFixed(0)}%</span><span class="pill">优先级 ${cl.priority.toFixed(1)}</span><span class="pill mut">标签来源 ${esc(cl.label_source)}</span>${dec?`<span class="pill">已拍板</span>`:""}</h3>`;
       h+=`<div class="sug">${esc(cl.suggestion)}</div>`;
       for(const r of cl.representatives.slice(0,2)){h+=`<pre><button class="lnk" data-t="${esc(r.trace_id)}">${esc(r.trace_id)}</button> · 失败维度：${esc((r.failed_dimensions||[]).map(dimZh).join("、"))||"—"}\n${esc(r.excerpt)}</pre>`;
         h+=(r.opinions||[]).slice(0,3).map(o=>`<div class="op">${esc(dimZh(o.dimension))} · ${esc(o.judge)}：${o.score}${o.label?" "+esc(LABEL_ZH[o.label]||o.label):""} — ${esc(o.rationale)}</div>`).join("");}
       h+=`<div class="act">`;
-      if(cl.cluster_id!==-1)h+=`<button class="btn ${sel?"":"pri"}" data-c="${cl.cluster_id}" ${sel?"disabled":""}>${sel?"已确认：先修这一类":"PM 确认：先修这一类"}</button>`;
+      if(cl.cluster_id!==-1){
+        h+=`<button class="btn ${sel?"":"pri"}" data-c="${cl.cluster_id}" ${sel?"disabled":""}>${sel?"已确认：先修这一类":"PM 确认：先修这一类"}</button>`;
+        h+=`<button class="btn" data-o="${cl.cluster_id}" ${cl.taxonomy_id?"":"disabled title=\"这一类没有 pack 类目映射，换类目排不出结果\""}>换这一类优先</button>`;
+        h+=`<button class="btn" data-r="${cl.cluster_id}">这一类不修</button>`;
+      }
       h+=`<button class="lnk" data-m="${cl.cluster_id}">查看 ${cl.size} 条成员 trace ›</button>${sel?`<span class="ok-msg">${esc(confirmed.next)}</span>`:""}</div>`;
       h+=`</div>`;
     }
     $("card").innerHTML=h;
-    $("card").querySelectorAll("button[data-c]").forEach(b=>b.onclick=async()=>{await j("/runs/"+enc(id)+"/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cluster_id:+b.dataset.c,decided_by:"pm"})});loadCard(id);});
-    const applyTemp=()=>{const tv=+$("tempSlider").value;localStorage.setItem("sparkjury_temp",String(tv));
-      const cap=tv<0.35?1:(tv<0.7?3:Infinity);const prof=tv<0.35?"p0 重点修":(tv<0.7?"standard":"full 全量");
-      $("tempLabel").textContent=`${tv.toFixed(2)} · ${prof}`;
-      let hid=0;$("card").querySelectorAll(".cl").forEach(el=>{
-        const show=(+el.dataset.decided===1)||(+el.dataset.rank<=cap);el.style.display=show?"":"none";if(!show)hid++;});
-      const n=$("tempNote");if(hid>0){n.style.display="";n.textContent=`当前温度下收起了 ${hid} 个簇（人拍过板的永远显示）——这是呈现浓度，不是没有 badcase；拉高温度可见全部。`;}else n.style.display="none";};
+    // 呈现层温度：档位与 pack thresholds.prioritize.focus 一致（p0<0.35 上限 1；standard<0.70 上限 3；full 全量）。
+    // 只收起不删除，且人拍过板的簇（data-decided=1）无视温度永远显示。
+    function applyTemp(){
+      const s=$("tempSlider");if(!s)return;const t=+s.value;localStorage.setItem("sj_temp",s.value);
+      const cap=t<0.35?1:(t<0.7?3:Infinity);
+      $("tempLabel").textContent=(t<0.35?"p0":(t<0.7?"standard":"full"))+" · "+t.toFixed(2);
+      let hidden=0;
+      $("card").querySelectorAll(".cl[data-rank]").forEach(el=>{
+        const show=el.dataset.decided==="1"||(+el.dataset.rank)<=cap;
+        el.style.display=show?"":"none";if(!show)hidden++;});
+      $("tempNote").textContent=hidden?`当前温度下收起了 ${hidden} 个簇（人拍过板的永远显示），拉高滑杆全量浮出`:"";
+    }
     $("tempSlider").oninput=applyTemp;applyTemp();
-    $("btnReject").onclick=async()=>{const note=prompt("本轮不修的理由（进决策账本）：","");if(note===null)return;
-      await j("/runs/"+enc(id)+"/reject",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({note,decided_by:"pm"})});loadCard(id);};
+    async function decide(kind,cluster_id,rationale){
+      const actor=($("actor")?.value||"").trim();
+      if(!actor){alert("先填「拍板人」：账本里的决策必须能追溯到人");return;}
+      localStorage.setItem("sj_actor",actor);
+      $("dmsg").textContent="";
+      try{
+        const r=await j("/runs/"+enc(id)+"/decision",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({decision_kind:kind,cluster_id:cluster_id,actor:actor,rationale:rationale||""})});
+        $("dmsg").textContent=`已记账 ${r.event.event_id} → ${r.ledger}`;
+        loadCard(id);
+      }catch(e){alert("没记上："+e.message);}
+    }
+    $("card").querySelectorAll("button[data-c]").forEach(b=>b.onclick=()=>decide("accept_card",+b.dataset.c,""));
+    $("card").querySelectorAll("button[data-o]").forEach(b=>b.onclick=()=>{
+      const why=prompt("为什么这一类要先修？（可留空，会写进决策账本当理由）","");
+      if(why===null)return;decide("override_priority",+b.dataset.o,why);});
+    $("card").querySelectorAll("button[data-r]").forEach(b=>b.onclick=()=>{
+      const why=prompt("为什么这一类不修？（必填：账本不接受没有理由的否决）","");
+      if(why===null)return;if(!why.trim()){alert("要写理由：账本不接受没有理由的否决");return;}
+      decide("reject_proposal",+b.dataset.r,why);});
     $("card").querySelectorAll("button[data-t]").forEach(b=>b.onclick=()=>openTrace(b.dataset.t));
     $("card").querySelectorAll("button[data-m]").forEach(b=>b.onclick=()=>openCluster(+b.dataset.m));
   }

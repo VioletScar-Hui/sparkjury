@@ -20,7 +20,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Callable
 
-from sparkjury import __version__
+from sparkjury import __version__, pack as pack_mod
 from sparkjury.adapters import load as load_traces
 from sparkjury.arbiter import Arbiter, JevClient
 from sparkjury.cluster import HashingEmbedder, OpenAIEmbedder, build_badcase, cluster_badcases, label_clusters
@@ -28,7 +28,7 @@ from sparkjury.harness.config import ALL_STAGES, RunConfig, Stage
 from sparkjury.harness.events import EventBus, EventKind
 from sparkjury.judges import MockJudge, OpenAICompatJudge, Panel, PanelConfig
 from sparkjury.judges.panel import build_judges
-from sparkjury.models.cluster import ClusterRun
+from sparkjury.models.cluster import ClusterRun, clusters_payload
 from sparkjury.precheck import PrecheckConfig, run_many
 from sparkjury.report import build_card, write_card
 from sparkjury.store import TraceStore
@@ -40,21 +40,13 @@ class Orchestrator:
         self.run_dir = config.run_dir
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.bus = bus or EventBus(config.run_id, self.run_dir / "events.jsonl")
-        # 评测标准指纹（接口①前置）：standards/scenario-pack 在则把 frozen_hash 戳进
-        # manifest——回归对比"标准没变过"从口头承诺变成两份 manifest 的字段比对。
-        pack_fp = None
-        _pm = Path("standards/scenario-pack/pack.manifest.json")
-        if _pm.exists():
-            try:
-                _pj = json.loads(_pm.read_text(encoding="utf-8"))
-                pack_fp = {"pack_id": _pj.get("pack_id"), "version": _pj.get("version"),
-                           "state": _pj.get("state"), "frozen_hash": _pj.get("frozen_hash")}
-            except (json.JSONDecodeError, OSError):
-                pack_fp = {"error": "pack.manifest.json unreadable"}
         self.manifest: dict[str, Any] = {
-            "run_id": config.run_id, "status": "running", "sparkjury_version": __version__, "pack": pack_fp,
+            "run_id": config.run_id, "status": "running", "sparkjury_version": __version__,
             "python": platform.python_version(), "host": platform.node(),
             "config": json.loads(config.model_dump_json()), "stages": {}, "degradations": [], "models": {},
+            # 这一轮评测用的是哪份 pack（内容寻址）。回归门禁要拿它判「两次跑的是不是同一个标准」：
+            # 不写下来，regress 就只能靠人记得当时用的是哪份 pack。
+            "pack_hash": pack_mod.frozen_hash(), "pack_id": pack_mod.pack_id(),
         }
         # a partial re-run (e.g. --stages CLUSTER,REPORT) keeps the earlier stages' records and model info
         prev = self.run_dir / "manifest.json"
@@ -288,9 +280,13 @@ class Orchestrator:
                          n_noise=sum(x.size for x in clusters if x.cluster_id == -1), embedder=emb_name, method=used,
                          clusters=clusters, badcases=badcases)
         self._store.put_cluster_run(run)
-        (self.run_dir / "clusters.json").write_text(run.model_dump_json(indent=2), encoding="utf-8")  # 接口②：产物落文件，下游 skill 有文件契约可吃
+        # 聚类结果以前只在 SQLite 和卡片里：下游（prioritize 的公式、regress 的新簇检测）要用，就得自己
+        # 查库或者拆卡片。跟 manifest/evalset 一样落一份文件，接缝才有契约。
+        art = self.run_dir / "clusters.json"
+        art.write_text(json.dumps(clusters_payload(run), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         self.manifest["models"]["embedder"] = emb_name
         return {"n_badcases": run.n_badcases, "n_clusters": run.n_clusters, "n_noise": run.n_noise, "method": used,
+                "clusters_file": str(art),
                 "label_sources": label_counts,
                 "labels": {f"#{x.rank}": f"{x.label.value} ({x.size})" for x in clusters if x.cluster_id != -1}}
 
