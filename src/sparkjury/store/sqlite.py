@@ -122,7 +122,9 @@ class Stats:
     trials_per_task: dict[int, int] = field(default_factory=dict)  # k -> number of tasks with k trials
     n_with_gold: int = 0
     pass_rate: float | None = None  # mean over traces with gold (= pass^1)
-    pass_k: dict[int, float] = field(default_factory=dict)  # k -> fraction of tasks passing all k trials
+    pass_k: dict[int, float] = field(default_factory=dict)  # k -> fraction of tasks passing all k trials (prefix estimator, legacy)
+    pass_k_comb: dict[int, float] = field(default_factory=dict)  # k -> combinatorial C(c,k)/C(n,k), τ-bench estimator (reliability floor)
+    pass_at_k: dict[int, float] = field(default_factory=dict)    # k -> at least one success in k draws (capability ceiling)
     avg_steps: float | None = None
     avg_tool_calls: float | None = None
     avg_tool_errors: float | None = None
@@ -139,6 +141,8 @@ class Stats:
             "n_with_gold": self.n_with_gold,
             "pass_rate": self.pass_rate,
             "pass_k": self.pass_k,
+            "pass_k_comb": self.pass_k_comb,
+            "pass_at_k": self.pass_at_k,
             "avg_steps": self.avg_steps,
             "avg_tool_calls": self.avg_tool_calls,
             "avg_tool_errors": self.avg_tool_errors,
@@ -276,6 +280,17 @@ class TraceStore:
                 eligible = [v for v in by_task.values() if len(v) >= k and all(x["success"] is not None for x in v[:k])]
                 if eligible:
                     st.pass_k[k] = sum(all(x["success"] for x in sorted(v, key=lambda x: x["trial"])[:k]) for v in eligible) / len(eligible)
+                    # 组合估计（τ-bench 口径，用全部 trial 而非前 k 个，方差更小）：
+                    # pass^k = mean C(c,k)/C(n,k)（可靠性下限）；pass@k = mean 1-C(n-c,k)/C(n,k)（能力上限）。
+                    # 二者一起报=给模型一个区间；区间宽度就是稳定性信号。旧 pass_k 保留（首 k 个 trial 口径）。
+                    from math import comb
+                    pk, pak = [], []
+                    for v in eligible:
+                        n, c = len(v), sum(bool(x["success"]) for x in v)
+                        pk.append(comb(c, k) / comb(n, k))
+                        pak.append(1.0 - (comb(n - c, k) / comb(n, k) if n - c >= k else 0.0))
+                    st.pass_k_comb[k] = sum(pk) / len(pk)
+                    st.pass_at_k[k] = sum(pak) / len(pak)
 
         def _avg(col: str) -> float | None:
             vals = [r[col] for r in rows if r[col] is not None]

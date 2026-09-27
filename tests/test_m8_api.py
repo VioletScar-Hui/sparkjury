@@ -285,3 +285,17 @@ def test_decision_endpoint_writes_a_governance_ledger(client, tmp_path):
     assert all(e["run_id"] == "dec-1" and e["skill"] == "report" for e in lines)
     for e in lines:
         validate_event(e)  # 消费端（PR#10 govern 的 _ledger.py）同一套规矩：target 必须带命名空间前缀
+
+
+def test_decisions_readback_only_returns_this_runs_events(client):
+    """看板回读：温度滑杆要钉住人拍过板的簇，靠 GET /decisions 拿本 run 的账本条目。"""
+    for rid in ("rb-1", "rb-2"):
+        client.post("/runs", json={"demo": True, "run_id": rid})
+        _wait(client, rid)
+        top = client.get(f"/runs/{rid}/clusters").json()["clusters"][0]
+        assert client.post(f"/runs/{rid}/decision", json={"decision_kind": "accept_card", "cluster_id": top["cluster_id"],
+                                                          "actor": "pm-li"}).status_code == 201
+    d = client.get("/runs/rb-1/decisions").json()
+    assert d["n"] == 1 and d["decisions"][0]["run_id"] == "rb-1"          # rb-2 的不掺进来
+    assert d["decisions"][0]["payload"]["cluster_id"] is not None         # 前端钉住簇靠这个字段
+    assert client.get("/runs/no-such/decisions").status_code == 404

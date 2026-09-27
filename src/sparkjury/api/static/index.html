@@ -432,15 +432,27 @@ code.cmd{display:block;background:var(--code-bg);border:1px solid var(--line-sof
     const t=c.totals,q=c.quality;
     const tiles=[[t.n_traces,"条 trace"],[t.n_env_failures,"环境失败"],[t.n_badcases,"badcase"],[t.n_clusters,"个簇"],[pct(q.pass_rate),"pass^1"]];
     for(const k in (q.pass_k||{}))if(+k>1)tiles.push([pct(q.pass_k[k]),"pass^"+k]);
+    // pass 区间砖：pass@k = 能力上限（k 次里至少一次），pass^k 组合估计 = 可靠性下限，差值 = 稳定性缺口
+    {const ks=Object.keys(q.pass_k_comb||{}).map(Number).filter(k=>k>1);
+     if(ks.length){const k=Math.max(...ks),lo=q.pass_k_comb[k],hi=(q.pass_at_k||{})[k];
+       if(hi!=null)tiles.push([pct(hi),"pass@"+k+" 上限"]);
+       if(lo!=null)tiles.push([pct(lo),"pass^"+k+" 下限"]);
+       if(hi!=null&&lo!=null)tiles.push([((hi-lo)*100).toFixed(1)+" pp","稳定性缺口"]);}}
     tiles.push([pct(q.judge_agreement_rate),"裁判一致率"],[q.n_degraded,"降级"]);
     let confirmed=null;try{confirmed=await j("/runs/"+enc(id)+"/confirm");}catch(e){}
+    // 人拍过板的簇：任何温度档都必须显示（抑制≠删除，人类决策优先于呈现层过滤）
+    const decided=new Set();
+    try{const dd=await j("/runs/"+enc(id)+"/decisions");
+        for(const e of dd.decisions||[]){const cid=(e.payload||{}).cluster_id;if(cid!=null)decided.add(+cid);}}catch(e){}
     let h=`<div class="tiles">${tiles.map(x=>`<div class="tile"><b>${esc(x[0])}</b><span>${esc(x[1])}</span></div>`).join("")}</div>`;
     h+=`<div class="rec"><span class="tag">建议</span>${esc(c.recommendation)}</div><div class="disc">${esc(c.disclaimer)}</div>`;
+    h+=`<div class="bar-row"><label for="tempSlider">呈现层温度</label> <input type="range" id="tempSlider" min="0" max="1" step="0.05" value="${esc(localStorage.getItem("sj_temp")||"1")}" style="vertical-align:middle;width:180px"> <span id="tempLabel"></span> <span id="tempNote" class="ok-msg"></span></div>`;
     // 拍板人：账本里的每一条决策都要能追溯到人，空着后端直接 400。存在 localStorage 里，不用每次填。
     h+=`<div class="maker"><label for="actor">拍板人</label><input id="actor" placeholder="你的名字（必填）" value="${esc(localStorage.getItem("sj_actor")||"")}"><span id="dmsg" class="ok-msg"></span></div>`;
     for(const cl of c.clusters){
       const name=cl.cluster_id===-1?"未归类":cl.label;const sel=confirmed&&confirmed.cluster_id===cl.cluster_id;
-      h+=`<div class="cl ${sel?"sel":""}"><h3><span class="rk">#${cl.rank}</span>${esc(name)}${cl.taxonomy_id?`<span class="pill mut">${esc(cl.taxonomy_id)}</span>`:""}<span class="pill">${cl.size} 条 · ${(cl.share*100).toFixed(0)}%</span><span class="pill">优先级 ${cl.priority.toFixed(1)}</span><span class="pill mut">标签来源 ${esc(cl.label_source)}</span></h3>`;
+      const dec=decided.has(+cl.cluster_id);
+      h+=`<div class="cl ${sel?"sel":""}" data-rank="${cl.rank}" data-decided="${dec?1:0}"><h3><span class="rk">#${cl.rank}</span>${esc(name)}${cl.taxonomy_id?`<span class="pill mut">${esc(cl.taxonomy_id)}</span>`:""}<span class="pill">${cl.size} 条 · ${(cl.share*100).toFixed(0)}%</span><span class="pill">优先级 ${cl.priority.toFixed(1)}</span><span class="pill mut">标签来源 ${esc(cl.label_source)}</span>${dec?`<span class="pill">已拍板</span>`:""}</h3>`;
       h+=`<div class="sug">${esc(cl.suggestion)}</div>`;
       for(const r of cl.representatives.slice(0,2)){h+=`<pre><button class="lnk" data-t="${esc(r.trace_id)}">${esc(r.trace_id)}</button> · 失败维度：${esc((r.failed_dimensions||[]).map(dimZh).join("、"))||"—"}\n${esc(r.excerpt)}</pre>`;
         h+=(r.opinions||[]).slice(0,3).map(o=>`<div class="op">${esc(dimZh(o.dimension))} · ${esc(o.judge)}：${o.score}${o.label?" "+esc(LABEL_ZH[o.label]||o.label):""} — ${esc(o.rationale)}</div>`).join("");}
@@ -454,6 +466,19 @@ code.cmd{display:block;background:var(--code-bg);border:1px solid var(--line-sof
       h+=`</div>`;
     }
     $("card").innerHTML=h;
+    // 呈现层温度：档位与 pack thresholds.prioritize.focus 一致（p0<0.35 上限 1；standard<0.70 上限 3；full 全量）。
+    // 只收起不删除，且人拍过板的簇（data-decided=1）无视温度永远显示。
+    function applyTemp(){
+      const s=$("tempSlider");if(!s)return;const t=+s.value;localStorage.setItem("sj_temp",s.value);
+      const cap=t<0.35?1:(t<0.7?3:Infinity);
+      $("tempLabel").textContent=(t<0.35?"p0":(t<0.7?"standard":"full"))+" · "+t.toFixed(2);
+      let hidden=0;
+      $("card").querySelectorAll(".cl[data-rank]").forEach(el=>{
+        const show=el.dataset.decided==="1"||(+el.dataset.rank)<=cap;
+        el.style.display=show?"":"none";if(!show)hidden++;});
+      $("tempNote").textContent=hidden?`当前温度下收起了 ${hidden} 个簇（人拍过板的永远显示），拉高滑杆全量浮出`:"";
+    }
+    $("tempSlider").oninput=applyTemp;applyTemp();
     async function decide(kind,cluster_id,rationale){
       const actor=($("actor")?.value||"").trim();
       if(!actor){alert("先填「拍板人」：账本里的决策必须能追溯到人");return;}

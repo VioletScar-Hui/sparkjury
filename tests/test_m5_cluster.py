@@ -150,7 +150,8 @@ def test_jev_labels_clusters_and_falls_back(scored_db):
     real = [c for c in clusters if c.cluster_id != -1]
     assert all(c.label == FailureLabel.WRONG_TOOL and c.label_source == "jev" and c.label_confidence == 0.71 for c in real)
     assert counts == {"jev": len(real), "heuristic": 0, "n_jev_failed": 0}
-    assert set(seen["criteria"]) == {l.value for l in FailureLabel} and "Representative evidence" in seen["state"]
+    # 接口④起，Choice 必须带逃生选项（外部实测：无出口时以 80%+ 置信押错）
+    assert set(seen["criteria"]) == {l.value for l in FailureLabel} | {"none_of_the_above"} and "Representative evidence" in seen["state"]
     # Jev down -> heuristic labels，同时如实回报「本来想用 Jev、实际没用上」的簇有几个
     bad = JevClient(api_key="k", transport=httpx.MockTransport(lambda r: httpx.Response(500)))
     counts = label_clusters(clusters, bcs, bad)
@@ -182,6 +183,35 @@ def test_store_and_cli(scored_db, monkeypatch):
     assert "falling back to hashing" in r.output
     r = runner.invoke(app, ["cluster", "--db", str(scored_db.parent / "none.db")])
     assert r.exit_code == 1
+
+
+def test_jev_label_choice_has_escape_option_and_it_degrades_honestly():
+    """接口④：Jev 的分类单选必须有出口。外部实测（190 次财报任务）：把正确选项拿掉后
+    Jev 仍以 80%+ 置信度押错——没有出口的单选题会逼决策模型硬选。选了出口 = JevError
+    = 走启发式降级并被调用方记账，而不是硬贴一个错标签。"""
+    import httpx
+    from sparkjury.arbiter.jev import JevClient, JevError
+    from sparkjury.cluster.taxonomy import label_with_jev
+    from sparkjury.models.cluster import Cluster, Representative
+
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        seen["criteria"] = body["questions"]["label"]["criteria"]
+        return httpx.Response(200, json={"answers": {"label": {
+            "type": "choice", "choice": "none_of_the_above",
+            "probabilities": {"none_of_the_above": 0.9}, "confidence": 0.9}}})
+
+    jev = JevClient(api_key="k", transport=httpx.MockTransport(handler), timeout_s=1.0)
+    cl = Cluster(cluster_id=0, size=1,
+                 representatives=[Representative(trace_id="t1", task_id="task-1", distance=0.1, excerpt="agent looped forever")])
+    try:
+        label_with_jev(cl, jev)
+        raise AssertionError("escape option 必须转成 JevError（降级信号），不能返回标签")
+    except JevError as e:
+        assert "escape" in str(e) or "none of the categories" in str(e)
+    assert "none_of_the_above" in seen["criteria"]
 
 
 def test_cli_cluster_writes_clusters_json(scored_db, tmp_path):

@@ -66,6 +66,8 @@ class CardTotals(BaseModel):
 class CardQuality(BaseModel):
     pass_rate: float | None = None                 # pass^1 from gold
     pass_k: dict[int, float] = Field(default_factory=dict)
+    pass_k_comb: dict[int, float] = Field(default_factory=dict)  # 组合估计：可靠性下限
+    pass_at_k: dict[int, float] = Field(default_factory=dict)    # 至少一次：能力上限
     agent_model: str | None = None
     judge_agreement_rate: float | None = None
     n_needing_arbitration: int = 0

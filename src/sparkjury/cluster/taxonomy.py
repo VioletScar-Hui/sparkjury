@@ -66,10 +66,17 @@ def label_with_jev(cluster: Cluster, jev: JevClient) -> tuple[FailureLabel, floa
     state_lines = [f"A cluster of {cluster.size} failing customer-service agent conversations. Representative evidence:"]
     for r in cluster.representatives:
         state_lines.append(f"--- {r.trace_id} ---\n{r.excerpt}")
+    # 逃生选项（接口④）：外部实测——把正确选项从列表拿掉后，Jev 仍以 80%+ 置信度
+    # 押与事实矛盾的选项。没有出口的单选题会逼一个决策模型硬选；给出口，选了就
+    # 如实降级走启发式，不硬贴标签。
+    criteria = dict(FailureLabel.descriptions())
+    criteria["none_of_the_above"] = "None of these categories fits the evidence."
     answers = jev.ask("\n".join(state_lines), {
-        "label": JevClient.q_choice("Which failure category best describes this cluster?", FailureLabel.descriptions())
+        "label": JevClient.q_choice("Which failure category best describes this cluster?", criteria)
     })
     choice, conf = JevClient.parse_choice(answers["label"])
+    if choice == "none_of_the_above":
+        raise JevError("jev took the escape option: none of the categories fits")
     try:
         return FailureLabel(choice), conf
     except ValueError as e:

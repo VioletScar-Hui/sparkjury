@@ -74,3 +74,26 @@ def test_cli_ingest_stats_show(tmp_path, tau2_path):
 
     r = runner.invoke(app, ["show", "missing", "--db", str(db)])
     assert r.exit_code == 1
+
+
+def test_pass_estimators_bracket(tmp_path):
+    """接口⑤：组合估计（τ-bench 口径）与 pass@k 并存——同一份数据三个口径各司其职。
+
+    构造 2 任务 × 3 trial：任务 A 成 2/3，任务 B 成 1/3。
+    pass^1(comb) = mean(c/n) = (2/3 + 1/3)/2 = 0.5（任务加权单次成功率）
+    pass^3(comb) = mean C(c,3)/C(3,3) = (0 + 0)/2 = 0（没有任务三连成）
+    pass@3      = 至少一次 = (1 + 1)/2 = 1.0（两任务都成过）
+    区间 [0, 1] 的宽度就是稳定性缺口的极端形态。旧 pass_k（首 k 个 trial）保留不动。
+    """
+    from sparkjury.models.trace import Trace, Outcome
+    db = tmp_path / "est.db"
+    with TraceStore(db) as s:
+        succ = {("A", 0): True, ("A", 1): True, ("A", 2): False,
+                ("B", 0): False, ("B", 1): True, ("B", 2): False}
+        s.upsert_traces([Trace(trace_id=f"{task}-{trial}", source="tau2", task_id=task, trial=trial,
+                               agent_model="m", steps=[], outcome=Outcome(success=ok))
+                         for (task, trial), ok in succ.items()])
+        st = s.stats()
+    assert abs(st.pass_k_comb[1] - 0.5) < 1e-9
+    assert st.pass_k_comb[3] == 0.0
+    assert st.pass_at_k[3] == 1.0

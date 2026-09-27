@@ -425,6 +425,14 @@ def create_app(runs_dir: str | Path = "runs", *, dgx_endpoints: list[dict[str, s
             out["confirm"] = _record_confirm(run_id, cl, body.note, actor)
         return out
 
+    @app.get("/runs/{run_id}/decisions")
+    def list_decisions(run_id: str) -> dict[str, Any]:
+        """本次 run 已落账本的决策（看板回读：人拍过板的簇要在任何温度档都显示）。"""
+        _manifest_or_404(run_id)
+        evs = [e for e in ledger.events()
+               if e.get("run_id") == run_id and e.get("event_type") == "decision"]
+        return {"run_id": run_id, "n": len(evs), "decisions": evs}
+
     @app.get("/runs/{run_id}/regress")
     def regress(run_id: str, before: str = Query(..., description="run_id of the earlier run")) -> dict[str, Any]:
         from sparkjury.regress import compare

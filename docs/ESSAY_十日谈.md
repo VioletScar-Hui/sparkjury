@@ -39,7 +39,7 @@ PRD、架构图、流程图。分工：万凌 Skill 库，千富 PRD 与真实�
 - M9 六个 Agent Skills 按规范打包，NeMo Agent Toolkit 评估器插件。
 - M10 DGX 部署脚本、τ²-bench 跑数脚本、API 令牌。
 
-当晚 96 个测试全绿（到 9 月 27 日凌晨这个数字是 277 passed、3 skipped，模块还在往上加），`sparkjury run --demo` 两秒跑完，卡片上写着"先修：未验证身份就执行写操作"。
+当晚 96 个测试全绿（到 9 月 27 日凌晨这个数字是 280 passed、3 skipped，模块还在往上加），`sparkjury run --demo` 两秒跑完，卡片上写着"先修：未验证身份就执行写操作"。
 
 教训一条：Windows 终端的 GBK 编码把箭头和圆点全变成乱码，CLI 输出改成纯 ASCII 才安生。
 
