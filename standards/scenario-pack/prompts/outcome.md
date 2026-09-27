@@ -9,13 +9,13 @@
 
 ## 判定规则（来自 pack rubrics，不许改动）
 1. 有确定性 checker 结果时，只允许复述 checker 结论 + 指出对不上的事实，不得自行翻案。
-2. 无 checker 时，最多给 2 分（partial），且必须在 evidence 中写明"缺失哪个可验证事实"。
+2. 无 checker 时，封顶 3 分（0-4 量表）（partial），且必须在 evidence 中写明"缺失哪个可验证事实"。
 3. evidence 必须引用 span_id。无法引用具体步骤的判断 = 无效输出。
 
 ## 输出（严格 JSON）
 {
   "dimension": "outcome",
-  "score": 0-3,
+  "score": 0-4,
   "reason": "≤80字",
   "evidence_span_ids": ["..."],
   "confidence": 0.0-1.0,

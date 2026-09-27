@@ -1,8 +1,8 @@
 {
   "pack_id": "retail-default",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "state": "FROZEN",
-  "frozen_hash": "6ecbd6676c3bafd1fb62e8768c01504655b88b1ce84ff27966031dfa874194eb",
+  "frozen_hash": "98761f3f9cdd559d53275791e3d74c98ab93753d01c2d70c30003e5a44bf1d37",
   "owner": "万凌",
   "created": "2026-09-26",
   "frozen_at": "2026-09-26",
@@ -14,5 +14,23 @@
     "prompts": "0.1.0",
     "checkers": "0.1.0"
   },
-  "notes": "首版默认包：tau2-bench retail 域。DRAFT 态允许 clarify/govern 写；进入 FROZEN 后只读，回归对比以此为基准。"
+  "notes": "首版默认包：tau2-bench retail 域。DRAFT 态允许 clarify/govern 写；进入 FROZEN 后只读，回归对比以此为基准。",
+  "history": [
+    {
+      "version": "0.2.0",
+      "bumped_at": "2026-09-27T19:27:04+08:00",
+      "change_summary": "v0.2：taxonomy 对齐运行时 FailureLabel（9类+runtime_label 映射+F99）、rubrics 0-4/tool_use/safety、judges Nemotron+StepFun API+Jev 使用纪律、thresholds fixability 九键/双公式/focus 档位收编/pass^k 对外 k=3+区间",
+      "decision_event_id": "evt-0002",
+      "actor": "万凌",
+      "previous_version": "0.1.0"
+    },
+    {
+      "version": "0.2.1",
+      "bumped_at": "2026-09-27T23:44:34+08:00",
+      "change_summary": "v0.2.1：focus 档位改块状 YAML（_yaml_lite 拒收裸键 flow，v0.2 冻结带病，语义不变）+ regress.gates 收编 severe_min=3.0（新严重簇门槛，#19/#20 生产端默认值的治理来源）",
+      "decision_event_id": "evt-0009",
+      "actor": "万凌",
+      "previous_version": "0.2.0"
+    }
+  ]
 }

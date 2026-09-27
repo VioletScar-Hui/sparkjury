@@ -150,3 +150,50 @@ def test_nat_plugin_files_are_consistent():
     assert "_type: sparkjury" in yml and "_type: trajectory" in yml and "profiler:" in yml
     import py_compile
     py_compile.compile(str(ROOT / "nat" / "nat_sparkjury" / "src" / "nat_sparkjury" / "register.py"), doraise=True)
+
+# ---- governance skills (skills-governance/, NOT in the model tool surface) --------------------
+#
+# 五个治理 skill 是人闸门的元操作层（pack 冻结/解冻、裁判画像、优先级、澄清、仲裁协议文档）。
+# 它们刻意不放进 skills/：M13 agent harness 只扫 skills/，模型不能自己调 govern 去解冻评测
+# 标准——README「不让 Agent 自己打分自己改」的红线在目录层面强制。结构校验与封装可达性
+# 在这里单独盯。
+
+GOVERNANCE = ROOT / "skills-governance"
+GOV_EXPECTED = ["sparkjury-arbitrate", "sparkjury-calibrate", "sparkjury-clarify",
+                "sparkjury-govern", "sparkjury-prioritize"]
+
+
+def test_governance_skills_exist_validate_and_stay_out_of_tool_surface():
+    dirs = sorted(d.name for d in GOVERNANCE.iterdir() if d.is_dir())
+    assert dirs == GOV_EXPECTED
+    for name in GOV_EXPECTED:
+        assert validate_skill(GOVERNANCE / name) == [], name
+    # 工具面隔离：agent harness 的技能根里绝不出现治理 skill
+    from sparkjury.agent.tools import SKILLS_ROOT
+    exposed = {d.name for d in SKILLS_ROOT.iterdir() if d.is_dir()}
+    assert not (exposed & set(GOV_EXPECTED))
+
+
+def test_governance_validator_script_runs():
+    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "validate_skills.py"), str(GOVERNANCE)],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "5/5 skills valid" in r.stdout
+
+
+@pytest.mark.parametrize("name", GOV_EXPECTED)
+def test_governance_wrapper_help(name):
+    """治理封装的 --help 可达。输出是中文：Windows runner 的 locale 是 cp1252，
+    必须显式按 UTF-8 解码，否则 0x81/0x8d 连续字节直接 UnicodeDecodeError。"""
+    script = GOVERNANCE / name / "scripts" / "run.py"
+    r = subprocess.run([sys.executable, str(script), "--help"], capture_output=True,
+                       encoding="utf-8", errors="replace", cwd=ROOT)
+    assert r.returncode == 0, r.stderr
+    assert "usage" in r.stdout.lower() or "用法" in r.stdout
+
+
+def test_governance_wrappers_compile():
+    import py_compile
+    for name in GOV_EXPECTED:
+        py_compile.compile(str(GOVERNANCE / name / "scripts" / "run.py"), doraise=True)
+

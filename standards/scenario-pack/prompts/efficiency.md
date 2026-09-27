@@ -14,4 +14,4 @@
 - 若某个"冗长"实际是必要的容错（如超时后退避重试），写明必要性 → 不扣
 
 ## 输出（严格 JSON）
-{"dimension": "efficiency", "score": 0-3, "reason": "≤80字", "metrics_used": ["..."], "confidence": 0.0-1.0}
+{"dimension": "efficiency", "score": 0-4, "reason": "≤80字", "metrics_used": ["..."], "confidence": 0.0-1.0}

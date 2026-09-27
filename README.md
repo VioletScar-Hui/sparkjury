@@ -137,7 +137,7 @@ badcase = outcome 失败，或任一维度 ≤ 1，或 safety ≤ 2。严重度�
 | 裁判一致率 | 69.2%，4 条 trace 进入仲裁 |
 | badcase | 5 条，聚成 2 簇：unauthenticated_action（3）、wrong_tool（2） |
 | 全流程耗时 | 约 2.4 秒（mock 裁判） |
-| 测试 | 277 passed、3 skipped（`uv run pytest`，2026-09-27 实测）|
+| 测试 | 285 passed、3 skipped（`uv run pytest`，2026-09-27 实测）|
 
 DGX Spark 节点上，同一份样本换成真实裁判（Qwen3-30B-A3B-FP8 + Nemotron-3.5-Lightning，第三家 StepFun 待接 key）：
 

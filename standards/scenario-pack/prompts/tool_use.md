@@ -1,6 +1,6 @@
-# prompts/process.md — 过程维裁判提示词
+# prompts/tool_use.md — 过程维裁判提示词
 
-你是 agent 轨迹的过程合规性评审。依据 rubrics.yaml 的 process checklist 逐项判定。
+你是 agent 轨迹的过程合规性评审。依据 rubrics.yaml 的 tool_use checklist 逐项判定。
 
 ## 输入
 - task.instruction / task.available_tools
@@ -15,9 +15,9 @@
 
 ## 输出（严格 JSON）
 {
-  "dimension": "process",
-  "subscores": {"selection": 0-3, "params": 0-3, "order": 0-3, "coverage": 0-3, "extra": 0-3},
-  "score": 0-3,
+  "dimension": "tool_use",
+  "subscores": {"selection": 0-4, "params": 0-4, "order": 0-4, "coverage": 0-4, "extra": 0-4},
+  "score": 0-4,
   "reason": "≤80字",
   "evidence_span_ids": ["..."],
   "confidence": 0.0-1.0

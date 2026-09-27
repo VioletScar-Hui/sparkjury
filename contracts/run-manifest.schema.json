@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eval-agent.local/contracts/run-manifest.schema.json",
+  "title": "RunManifest",
+  "description": "一次评测运行的五元组指纹 + 产出物清单。可审计/可溯源/可对比的载体。回归铁律：前后两轮对比必须 pack_hash 相同。",
+  "type": "object",
+  "required": ["run_id", "started_at", "trace_version", "pack", "skill_versions", "outputs"],
+  "properties": {
+    "run_id": { "type": "string" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "ended_at": { "type": ["string", "null"], "format": "date-time" },
+    "trace_version": { "const": "trace.v1" },
+    "pack": {
+      "type": "object",
+      "required": ["pack_id", "version", "pack_hash"],
+      "properties": {
+        "pack_id": { "type": "string" },
+        "version": { "type": "string" },
+        "pack_hash": { "type": "string", "description": "FROZEN 态 pack 的内容 sha256，scripts/pack_freeze.py 生成" },
+        "state_at_run": { "const": "FROZEN" }
+      }
+    },
+    "skill_versions": {
+      "type": "object",
+      "description": "本次实际调用的 skill -> 版本，如 {\"score\": \"0.1.0\"}",
+      "additionalProperties": { "type": "string" }
+    },
+    "model_versions": {
+      "type": "object",
+      "description": "裁判/embedding/仲裁模型 -> 版本或端点指纹",
+      "additionalProperties": { "type": "string" }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["skill", "artifact", "hash"],
+        "properties": {
+          "skill": { "type": "string" },
+          "artifact": { "type": "string", "description": "如 scores.json / clusters.json / card.json" },
+          "hash": { "type": "string" },
+          "records": { "type": "integer" }
+        }
+      }
+    },
+    "degraded_flags": {
+      "type": "array",
+      "description": "降级标记：jev_unreachable / judge_c_api_fallback / cluster_rule_fallback ...",
+      "items": { "type": "string" }
+    },
+    "route": {
+      "type": "object",
+      "description": "本次执行的链路计划快照（执行前预测的落地）",
+      "properties": {
+        "entry": { "type": "string" },
+        "skills_invoked": { "type": "array", "items": { "type": "string" } },
+        "dimensions": { "type": "array", "items": { "type": "string" } },
+        "estimated_judge_calls": { "type": "integer" },
+        "user_confirmed": { "type": "boolean" }
+      }
+    },
+    "ledger_path": { "type": "string" }
+  }
+}

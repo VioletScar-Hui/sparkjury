@@ -318,7 +318,7 @@ uv run sparkjury serve --host 127.0.0.1 --port 9000
   - `nat/nat_sparkjury/`：NAT 插件包。`register.py` 用 `EvaluatorBaseConfig` 子类（name="sparkjury"）加 `@register_evaluator` 注册，`pyproject.toml` 通过 `nat.components` 入口点让 NAT 发现它。
   - `nat/configs/sparkjury_eval.yml`：`nat eval` 配置示例，同时挂 NAT 自带的 trajectory 评估器、profiler 和我们的 sparkjury 评估器，judge 指向本地 vLLM。
   - `nat/README.md`：安装与运行步骤，以及"NAT 提供轨迹评估与 profiler，SparkJury 补跨模型仲裁与归因优先级"的定位说明。
-- `tests/test_m9_skills_nat.py`：13 个用例（3 个按设计跳过）：六个 skill 存在且全部通过规范校验、frontmatter 内容、校验器能抓坏例、校验脚本可运行、单命令封装能到达 CLI 的 --help、全部脚本可编译；NAT 适配器对字典和对象两种输入的步骤重建与错误识别；评估器核心的打分范围、维度子集、批量均值、环境失败得 0；插件文件一致性。
+- `tests/test_m9_skills_nat.py`：18 个用例（3 个按设计跳过）：十一个 skill 存在且全部通过规范校验（六个阶段 skill + 五个治理 skill：arbitrate/calibrate/clarify/govern/prioritize，2026-09-27 扩入）、frontmatter 内容、校验器能抓坏例、校验脚本可运行、单命令封装能到达 CLI 的 --help、全部脚本可编译；NAT 适配器对字典和对象两种输入的步骤重建与错误识别；评估器核心的打分范围、维度子集、批量均值、环境失败得 0；插件文件一致性。
 
 **自测结果**：`uv run pytest` 82 passed, 3 skipped。`scripts/validate_skills.py` 6/6 valid。另外手动跑了 sparkjury-report 和 sparkjury-clean 两个封装脚本，正常产出。
 

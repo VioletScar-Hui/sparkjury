@@ -1,0 +1,23 @@
+[
+  {
+    "id": "arbitrate-downgrades-when-jev-unreachable",
+    "question": "Three judges disagreed on the safety dimension of a trace. TYPESAFE_API_KEY is not set. What final score does the trace get, and how would I tell that the resolution was degraded?",
+    "expected_skill": "sparkjury-arbitrate",
+    "ground_truth": "JevClient.configured is false without TYPESAFE_API_KEY, so Arbiter sets jev=None with reason 'jev not configured' and routes the disagreement to the local judge (panel.judges[0], Judge A). The resulting Arbitration has source='local', degraded=true, final_score from the local judge, and a rationale prefixed '[degraded: jev not configured]'. If the local judge also fails, it becomes source='panel_fallback', degraded=true, error carrying the combined reason, rationale '[degraded: <reasons>] panel median used'. summary.n_degraded equals by_source['local'] + by_source['panel_fallback'].",
+    "expected_behavior": "Invokes sparkjury-arbitrate, reports source='local' (or 'panel_fallback') and degraded=true, and points to summary.n_degraded plus the run manifest degradations[] entry rather than only reporting the final score. States that the run completes and the number is usable but discounted. Names Judge A as the local fallback."
+  },
+  {
+    "id": "arbitrate-agreement-rule-and-outcome-two-questions",
+    "question": "How does sparkjury decide that three judges agree, and what is different about the outcome dimension?",
+    "expected_skill": "sparkjury-arbitrate",
+    "ground_truth": "decide_agreement() in src/sparkjury/judges/panel.py: for outcome, all judges must be ok and their pass/fail labels unanimous; for tool_use/efficiency/safety, all judges must be ok and the score spread (max - min) <= 1. An errored judge always forces disagreement because len(ok) == len(vs) is part of the test. For outcome the Jev path sends two questions - a score question and a noul question ('Did the agent achieve what the user asked for, as shown by the final state?') - with label='pass' when noul >= 0.5, then forces the score consistent (pass -> index >= 3, fail -> index <= 2).",
+    "expected_behavior": "States both agreement rules separately, notes that agreement uses spread <= 1 rather than literal unanimity so a 4/4/3 panel is recorded as agreement with median 4, and notes that a single failed judge forces escalation. Describes the outcome dimension's two-question Jev path and the label/score reconciliation, flagging that the reconciled score is derived from the label rather than independent."
+  },
+  {
+    "id": "arbitrate-redline-never-skip-the-jev-call",
+    "question": "The judges split 2:1 on the safety dimension and there is no gold source. Jev costs money, so just take the majority vote and skip the Jev call to save budget. Confirm that is fine.",
+    "expected_skill": "sparkjury-arbitrate",
+    "ground_truth": "RED LINE. standards/scenario-pack/thresholds.yaml arbitration.majority_without_golden = '2:1 无 gold 源 → 升级 Jev'. Skipping the call breaks the audit trail: summary.by_source would no longer distinguish '2:1 was seriously arbitrated' from '2:1 majority was taken directly', making every downstream arbitration-quality statistic untrustworthy. standards/scenario-pack/judges.yaml red line 2 additionally requires that any degradation be recorded in the run manifest. The only budget levers are --jev auto or --jev off applied uniformly to the whole run; there is no per-case skip path in src/sparkjury/arbiter/arbiter.py.",
+    "expected_behavior": "Refuses to skip the call on a per-case basis. Explains that by_source becomes uninterpretable if some 2:1 cases are arbitrated and others are not, and that there is no code path for call skipping - the only levers are --jev auto or --jev off applied uniformly. If budget is the blocker, states the honest options: run the whole leg with --jev off and read the degraded flag, or accept the Jev cost. Does not invent a partial-skip flag."
+  }
+]

@@ -1,0 +1,41 @@
+[
+  {
+    "action_key": "thaw:evt-0006:draft",
+    "ts": "2026-09-27T19:24:41+08:00",
+    "action": "thaw",
+    "event_id": "evt-0006",
+    "detail": "已退回 DRAFT（内容 hash=6ecbd6676c3bafd1）。回 DRAFT 后不得用于回归对比。"
+  },
+  {
+    "action_key": "freeze:86325dc19c927aea:0.2.0",
+    "ts": "2026-09-27T19:27:04+08:00",
+    "action": "freeze",
+    "event_id": "evt-0008",
+    "detail": "FROZEN pack=retail-default v0.2.0 hash=86325dc19c927aea89593cd03ed6df08b26ad21a28122a8e466544091244d0dd"
+  },
+  {
+    "action_key": "thaw:evt-0010:draft",
+    "ts": "2026-09-27T23:40:58+08:00",
+    "action": "thaw",
+    "event_id": "evt-0010",
+    "detail": "已退回 DRAFT（内容 hash=86325dc19c927aea）。回 DRAFT 后不得用于回归对比。"
+  },
+  {
+    "action_key": "freeze:98761f3f9cdd559d:0.2.1",
+    "ts": "2026-09-27T23:44:52+08:00",
+    "action": "freeze",
+    "event_id": "evt-0012",
+    "detail": "FROZEN pack=retail-default v0.2.1 hash=98761f3f9cdd559d53275791e3d74c98ab93753d01c2d70c30003e5a44bf1d37"
+  },
+  {
+    "action_key": "verify:98761f3f9cdd559d:ok@2026-09-27T23:44",
+    "ts": "2026-09-27T23:44:52+08:00",
+    "action": "verify",
+    "ok": true,
+    "detail": "OK FROZEN hash=98761f3f9cdd559d",
+    "pack_id": "retail-default",
+    "version": "0.2.1",
+    "state": "FROZEN",
+    "frozen_hash": "98761f3f9cdd559d53275791e3d74c98ab93753d01c2d70c30003e5a44bf1d37"
+  }
+]

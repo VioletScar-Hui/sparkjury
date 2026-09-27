@@ -1,5 +1,6 @@
-# thresholds.yaml — 阈值与权重（scenario pack 策略数据）
-# v0.1 默认值。黄金决策池积累后，govern 提案调整，人批准才生效。
+# thresholds.yaml — 阈值与权重 v0.2（scenario pack 策略数据）
+# v0.2（2026-09-27，PM 批准 evt-0002/3/4）：fixability 键对齐九类 taxonomy、双公式声明、
+# focus 温度档位收编、pass^k 对外口径固定。黄金决策池积累后，govern 提案调整，人批准才生效。
 
 scoring:
   judge_repeats: 2               # 每条每维跑几遍（本地免费，用重复换稳定）
@@ -25,27 +26,47 @@ cluster:
 prioritize:
   formula: "priority = frequency_norm * severity_weight * fixability_boost"
   severity_weights: { "3": 1.0, "2": 0.6, "1": 0.3 }
-  fixability_boost:              # 可修复性先验，v0.1 人工设定，黄金池校准
-    F01: 1.0   # 工具选择：改工具描述通常可修
-    F02: 1.2   # 参数错误：常有明确修法
-    F03: 1.0
-    F04: 0.8   # 遗漏动作：可能需要改 prompt 结构
-    F05: 0.6
-    F06: 1.2   # 冗余空转：常有明确修法
-    F07: 1.2   # 未验证：加回查步骤
-    F08: 0.5   # 危险动作：往往要动产品规则，不只是 prompt
-    F09: 0.8
-    F10: 0.8
-    F11: 0.9
-    F12: 0.7
+  fixability_boost:              # 可修复性先验 v0.2（人工设定，黄金池校准中；evt-0001 是第一条校准数据）
+    F01: 1.0   # wrong_tool：改工具描述通常可修
+    F02: 1.2   # wrong_args：常有明确修法
+    F03: 1.0   # missing_lookup：加"先查后动"规则
+    F06: 1.2   # loop：prompt 规则可修（apply_prompt_fix.sh 三规则实证路径）
+    F07: 1.2   # missing_confirmation：加确认步骤规则
+    F08: 1.2   # unauthenticated_action：工具层门禁（卡片建议原文）
+    F10: 0.8   # hallucinated_info：往往要动模型/检索，不只是 prompt
+    F11: 0.7   # policy_violation：常需产品规则联动
+    F12: 0.9   # premature_stop：重试/回问策略可修
+  formula_runtime: "size × mean(severity)（运行时 cluster 内实现，卡片主显）"
+  formula_note: "双公式并存（PM 批准 evt-0003）：卡片主显运行时公式（简单可讲），本三因子公式作黄金池校准载体"
+  focus:                         # 呈现层温度档位（v0.2 从 focus.py 技能常量收编进 pack）
+    # 块状写法是硬约束：_yaml_lite 借 json.loads 解 flow 结构，裸键 {name: p0} 必拒（v0.2.1 修复）
+    - name: p0
+      max_t: 0.35
+      min_severity: 3
+      min_share: 0.10
+      queue_cap: 1
+    - name: standard
+      max_t: 0.70
+      min_severity: 2
+      min_share: null
+      queue_cap: 3
+    - name: full
+      max_t: 1.01
+      min_severity: 0
+      min_share: null
+      queue_cap: null
   top_recommendation_count: 1    # 证据卡只给一个"先修这个"，人的注意力是稀缺资源
 
 regress:
-  pass_k: 3                      # tau2-bench 口径，pass^3
-  same_pack_hash_required: true  # 铁律：pack 不同 = 新一轮评测，不是回归
+  pass_k: 3                      # 对外汇报固定 k=3（PM 批准 evt-0004）
+  k_reporting: fixed             # 运行时自适应 k 仅限内部；对外口径固定，trial<3 必须显式标注"本轮 k=N"
+  report_bracket: true           # 卡片同时报 pass@k（能力上限）与 pass^k（可靠性下限）+ 区间宽度（稳定性信号）
+  estimator: "combinatorial C(c,k)/C(n,k)"   # 接口需求⑤：统一估计器，消灭三种 pass^1 并存
+  same_pack_hash_required: true
   gates:
     primary_metric: "task_pass_rate"
     new_severe_cluster_blocks: true   # 引入新的 severity>=3 类 → 不通过
+    severe_min: 3.0               # "新严重簇"的 severity 门槛（运行期加权尺度，非序数 1-3；批准 evt-0009）
     delta_min: 0.02               # 主指标提升低于 2 个百分点 → 不通过
 
 report:
