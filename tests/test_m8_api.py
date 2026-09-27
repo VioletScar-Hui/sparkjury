@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from pathlib import Path
 
@@ -125,6 +126,22 @@ def test_dgx_sample_handles_unified_memory_na(monkeypatch):
     g = dgx_mod.sample_gpus()
     assert g["available"] and g["gpus"][0]["unified_memory"] and g["gpus"][0]["mem_total_mb"] == 121000.0
     assert g["gpus"][0]["util_pct"] == 3.0 and g["gpus"][0]["temp_c"] is None
+
+
+def test_cockpit_page_has_the_three_inspector_views_and_works_offline():
+    """TEAM.md round 5, C group: verdicts side by side, regression, cluster drill-down, all on the board and offline."""
+    from sparkjury.api.app import STATIC_DIR
+
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    for hook in ['data-tab="verdicts"', 'data-tab="clusters"', 'data-tab="regress"', 'id="trSel"', 'id="rgBefore"', 'id="clusters"']:
+        assert hook in html, hook
+    # each view reads the M8 endpoint it is built on
+    assert '"/traces/"+enc(tid)' in html and '"/traces?cluster="+cid' in html and '"/regress?before="+enc(before)' in html
+    # a replayed run_end must not reload the run (that looped forever)
+    assert 'if(ev.kind==="run_end"&&live)' in html
+    # offline: no external scripts, styles, fonts or images
+    assert not re.search(r'(src|href)=["\']https?://', html), "cockpit must not load anything from the network"
+    assert "<script src" not in html and "@import" not in html
 
 
 # ---- 请求里的路径不能决定宿主机上删/写哪个文件 ------------------------------------------------

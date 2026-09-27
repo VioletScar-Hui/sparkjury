@@ -14,9 +14,7 @@ skills:
   - sparkjury-cluster
   - sparkjury-report
   - sparkjury-regress
-  - sparkjury-arbitrate
-  - sparkjury-calibrate
-  - sparkjury-prioritize
-  - sparkjury-clarify
-  - sparkjury-govern
+# governance skills (human-gated meta layer, in skills-governance/, NOT in the model tool
+# surface; registry schema has a single skills_path, submit as a second component if needed):
+#   sparkjury-arbitrate / sparkjury-calibrate / sparkjury-clarify / sparkjury-govern / sparkjury-prioritize
 tags: [evaluation, agents, dgx-spark, llm-as-judge, tau2-bench, opentelemetry]

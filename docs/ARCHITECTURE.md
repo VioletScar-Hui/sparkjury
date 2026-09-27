@@ -168,6 +168,17 @@ sparkjury/
 │   │   ├── runs.py               #   run 目录与 manifest 读写
 │   │   ├── dgx.py                #   nvidia-smi 采样
 │   │   └── static/index.html     #   Cockpit 单页前端
+│   ├── agent/                    # M13  模型自己读技能、自己调工具的那一层
+│   │   ├── ai.py                 #   统一模型入口（四个本地端点 + 云端）
+│   │   ├── tools.py              #   工具注册表：技能按需加载与执行
+│   │   ├── loop.py               #   agent loop（steering / follow-up / abort）
+│   │   ├── session.py            #   会话树：只追加、带 parent 指针
+│   │   ├── store.py              #   三个存储 + 原子事务
+│   │   ├── ops.py                #   操作状态机：run / compaction / navigation
+│   │   ├── compact.py            #   历史压缩：摘要顶替更老的消息
+│   │   ├── hooks.py              #   四个挂点（请求前、工具前后、每轮结束）
+│   │   ├── runtime.py            #   run 目录、事件流、用量账本、操作日志、manifest
+│   │   └── cli.py                #   sparkjury agent 子命令
 │   └── cli.py                    # 所有 Skill 的命令入口
 ├── skills/                       # M9 每个 Skill 一个 SKILL.md
 ├── nat/                          # M9 NeMo Agent Toolkit 配置
@@ -225,11 +236,12 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 | M5 | badcase 聚类与优先级 | P0 | 已完成，9 个用例 |
 | M6 | 证据卡片 + 回归对比 | P0 | 已完成，8 个用例 |
 | M7 | Harness 编排器 | P0 | 已完成，9 个用例 |
-| M8 | API + Agent Cockpit | 后端 P0 / 前端 P1 | 后端与兜底页已完成，11 个用例 |
-| M9 | Agent Skills 打包 + NeMo Agent Toolkit | P1 | 已完成，21 个用例（3 个跳过）|
+| M8 | API + Agent Cockpit | 后端 P0 / 前端 P1 | 后端与兜底页已完成，12 个用例 |
+| M9 | Agent Skills 打包 + NeMo Agent Toolkit | P1 | 已完成，24 个用例（3 个跳过）|
 | M10 | DGX 部署 + τ²-bench 跑数 + 演示数据 | P0 | 脚本与 token 已完成，18 个用例；节点上执行待做 |
 | M11 | README / 征文 / 视频脚本 | P0 | 初稿已完成，2 个用例；截图、真实数字、录制待补 |
 | M12 | 跨平台与仓库约定守卫 | P1 | 已完成，17 个用例 |
+| M13 | Agent harness（模型自己调技能 + 可恢复） | P1 | 已完成，65 个用例 |
 
 「N 个用例」指该模块测试文件被收集到的用例数（不是通过数），有跳过的在括号里注明。
 这张表由 `scripts/certificate.py` 逐行核对，改测试不改表会红。
@@ -398,6 +410,7 @@ Cockpit 三栏：左 USER TASK（本轮配置），中 AGENT TIMELINE（状态�
 | M3 M4 M5 M6 M9 | 万凌（Skill 库） | 接口与 mock 由本方案提供 |
 | M8 Cockpit | 剑乔 | 后端 API 由本方案提供 |
 | M10 部署与跑数 | 滨辉 | 脚本由本方案提供 |
+| M13 Agent harness | 滨辉 | 工具注册表复用 M9 的六个技能 |
 | M11 文档与故事 | 千富、人瑜 | 全员 |
 
 ## 12. 排期
@@ -438,9 +451,46 @@ Cockpit 三栏：左 USER TASK（本轮配置），中 AGENT TIMELINE（状态�
 - 十日谈征文链接
 - 团队合影
 
-## 16. 当前进度与验证方法
+## 16. Agent harness（M13）
 
-M1 到 M12 已完成（M10 节点执行、M11 录制待做），136 个 pytest 用例通过。一条命令跑通全流程：
+裁判客户端只会「问一句答一句」：没有工具、没有多轮、没有循环；六个技能是给人用的命令，被评 Agent 跑在
+τ²-bench 自己的框架里。也就是说，SparkJury 自己是个 Agent 系统，但它家的模型从没动过手。
+
+M13 补这一层，参照 pi（earendil-works/pi）的 harness 分层，只做最小闭环：
+
+| 层 | 文件 | 管什么 |
+|---|---|---|
+| 模型 | `agent/ai.py` | 四个本地端点 + 云端共用一个 `complete()`；换模型只换 `--model` |
+| 工具 | `agent/tools.py` | 工具注册表；六个技能按需加载（`load_skill`）与执行（`run_skill`），加两个只读文件工具 |
+| 循环 | `agent/loop.py` | 消息 → 模型 → 工具 → 结果；steering / follow-up / abort 三个打断口 |
+| 会话 | `agent/session.py` | 只追加的 `session.jsonl`，每条带 parent 指针，可分支、可回放 |
+| 装配 | `agent/runtime.py` | run 目录、事件流、用量账本、manifest |
+
+两条决定行为的规矩：技能正文**不进**提示词，只放一句话描述，模型要看细节自己调 `load_skill`；
+工具失败**是消息不是崩溃**，技能名写错、文件不存在、子进程超时都变成模型读得到的一句话，
+同时记一笔失败，收尾出现在 manifest 的 `degradations` 里。
+
+事件流复用 M7 的 `EventBus`（`stage=AGENT`），看板不用改就能看到 agent 在干什么。
+
+**中层：可恢复**。最小闭环的循环只会往前跑，进程一没就说不清上次跑到哪了。中层补上 pi 的
+durable 那一段：
+
+| 补的东西 | 文件 | 解决了什么 |
+|---|---|---|
+| 三个存储 + 原子事务 | `agent/store.py` | 只追加的会话树与用量账本、可替换的 values；整份替换走临时文件 + `os.replace`，崩溃不留半套状态；被写坏的最后一行跳过但记下来 |
+| 操作状态机 | `agent/ops.py` | 一次 run 是一条操作（`run`/`compaction`/`navigation`），只追加的 `ops.jsonl`，当前状态折叠得出 |
+| 中断恢复 | `agent/loop.py` `agent/runtime.py` | `resume` 从断点接着跑：已有结果的工具调用**重放而不重跑**；只有开始标记没有结果的按「状态未知」处理，不许自动重跑 |
+| 历史压缩 | `agent/compact.py` | prompt 超预算时插一条摘要 entry 顶替更老的消息，原文一条不删 |
+| 钩子 | `agent/hooks.py` | 请求前可改消息、工具执行前可拦下（返回理由）、工具执行后与每轮结束可观察 |
+
+四个原语对应关系：`accept`（建操作）、`drive`（推进）、`request_abort`（中断）、`inspect`
+（看现场）。命令行是 `sparkjury agent ops <run_dir>`（现场 + 操作日志）、`agent resume <run_dir>`
+（接着跑）、`agent compact <session.jsonl>`（压缩，默认只试算），`agent run` 多了
+`--compact-budget`。详见 `docs/AGENT_HARNESS.md`。
+
+## 17. 当前进度与验证方法
+
+M1 到 M13 已完成（M10 节点执行、M11 录制待做），205 个 pytest 用例通过。一条命令跑通全流程：
 
 ```
 cd sparkjury

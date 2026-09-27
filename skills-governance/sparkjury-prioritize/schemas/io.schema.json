@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sparkjury.local/skills-governance/sparkjury-prioritize/schemas/io.schema.json",
+  "title": "PrioritizeIO",
+  "description": "sparkjury-prioritize（失败类优先级排序）的输入输出契约。envelope 层见 contracts/skill-envelope.schema.json。公式与全部系数以 standards/scenario-pack/thresholds.yaml 的 prioritize 段为唯一真相源，本 schema 不复制系数值，只约束形状。",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "description": "clusters.json（上游 cluster 产出）+ pack 引用 + 可选 override 历史。",
+      "required": ["clusters"],
+      "properties": {
+        "clusters": {
+          "type": "array",
+          "description": "已分类的簇。本 skill 只用其中 label/size/severity_max/trace_ids/category_name。",
+          "items": {
+            "type": "object",
+            "required": ["label", "size", "severity_max"],
+            "properties": {
+              "cluster_id": { "type": "string" },
+              "label": {
+                "type": "string",
+                "pattern": "^F[0-9]{2}$",
+                "description": "必须命中 taxonomy id。作为 fixability_boost 的查表键。"
+              },
+              "category_name": { "type": "string" },
+              "size": { "type": "integer", "minimum": 1 },
+              "severity_max": { "type": "integer" },
+              "trace_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "cluster_report": {
+          "type": "object",
+          "description": "上游 cluster_report.json。total_badcases 是本 skill 的权威分母。",
+          "properties": {
+            "total_badcases": { "type": "integer", "minimum": 1 },
+            "cluster_count": { "type": "integer" },
+            "unclassified_count": { "type": "integer" },
+            "f99_share": { "type": "number" }
+          }
+        },
+        "pack": {
+          "type": "object",
+          "required": ["thresholds"],
+          "properties": {
+            "pack_id": { "type": ["string", "null"], "description": "无 --pack 且未显式传参时为 null（不写死常量）" },
+            "version": { "type": ["string", "null"] },
+            "pack_hash": { "type": ["string", "null"] },
+            "state_at_run": {
+              "type": ["string", "null"],
+              "enum": ["FROZEN", "DRAFT", "UNKNOWN", null],
+              "description": "来自 pack.manifest.json；无 manifest 绑定时为 UNKNOWN，不许沿用 FROZEN 常量。"
+            },
+            "pack_bound": {
+              "type": "boolean",
+              "description": "true = pack 身份读自真实 pack.manifest.json（--pack）；false = 只拿到显式传参，随附 degraded flag pack_manifest_unbound。"
+            },
+            "pack_source": { "type": "string", "description": "manifest:<path> 或 cli_args，自证身份从哪来。" },
+            "thresholds": { "type": "string", "description": "standards/scenario-pack/thresholds.yaml 路径" }
+          }
+        },
+        "override_history": {
+          "type": "array",
+          "description": "可选：ledger 里 decision_kind=override_priority 的历史人工修正。匹配键是 taxonomy_id，target 只是 PM 语义（cluster_id）。",
+          "items": {
+            "type": "object",
+            "required": ["target"],
+            "properties": {
+              "event_id": { "type": "string" },
+              "actor": { "type": "string" },
+              "target": {
+                "type": "string",
+                "description": "PM 语义上的被改对象 = cluster_id（形如 C03）。不作为排序匹配键。"
+              },
+              "taxonomy_id": {
+                "type": "string",
+                "pattern": "^F[0-9]{2}$",
+                "description": "v0.2 起的权威匹配键 = category_id。缺它且 target 不是 F\\d\\d 形状 → 该事件进 override_unmatched，不静默丢弃。"
+              },
+              "to_rank": {
+                "type": ["integer", "null"],
+                "description": "人工给出的名次。缺省视为只标记不改序。"
+              },
+              "system_top": {
+                "type": ["string", "null"],
+                "description": "改排序前系统的 top 类（govern 投影 3 的校准对象）。"
+              },
+              "human_top": {
+                "type": ["string", "null"],
+                "description": "改排序后人工的 top 类。prioritize 只透传，不解释。"
+              },
+              "rationale": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "description": "priority.json 的 payload 形状。",
+      "required": ["ranked", "top_recommendation", "rejected_candidates", "meta"],
+      "properties": {
+        "ranked": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["rank", "category_id", "priority", "frequency", "severity", "fixability", "rationale"],
+            "properties": {
+              "rank": { "type": "integer", "minimum": 1 },
+              "category_id": { "type": "string", "pattern": "^F[0-9]{2}$" },
+              "category_name": { "type": "string" },
+              "priority": {
+                "type": "number",
+                "description": "frequency_norm × severity_weight × fixability_boost。"
+              },
+              "frequency": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "= frequency_norm = 类内 badcase 数 / 总 badcase 数。"
+              },
+              "frequency_count": { "type": "integer" },
+              "severity": { "type": "integer", "description": "= 簇的 severity_max。" },
+              "severity_weight": { "type": "number" },
+              "fixability": { "type": "number", "description": "来自 pack fixability_boost[category_id]。" },
+              "fixability_source": { "const": "human_prior_pack_v0.1_uncalibrated" },
+              "trace_count": { "type": "integer" },
+              "rationale": {
+                "type": "string",
+                "description": "必须能还原成三个因子的乘法；被 override 时追加人工修正来源。"
+              },
+              "override_applied": {
+                "type": ["object", "null"],
+                "description": "非空表示本条位置由人工决策决定，含 ledger event_id 与 rank 变化。"
+              }
+            }
+          }
+        },
+        "top_recommendation": {
+          "type": ["object", "null"],
+          "description": "只给一个。pack thresholds.prioritize.top_recommendation_count = 1。",
+          "required": ["category_id", "one_line_reason"],
+          "properties": {
+            "category_id": { "type": "string", "pattern": "^F[0-9]{2}$" },
+            "one_line_reason": { "type": "string" },
+            "priority": { "type": "number" }
+          }
+        },
+        "rejected_candidates": {
+          "type": "array",
+          "description": "不可排序的类。缺系数一律拒排，不补默认值。",
+          "items": {
+            "type": "object",
+            "required": ["category_id", "reason"],
+            "properties": {
+              "category_id": { "type": "string", "pattern": "^F[0-9]{2}$" },
+              "category_name": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "meta": {
+          "type": "object",
+          "properties": {
+            "formula": { "type": "string" },
+            "total_badcases": { "type": "integer" },
+            "total_badcases_source": {
+              "type": "string",
+              "description": "分母来源：explicit_arg / cluster_report.json / sum_of_cluster_sizes。"
+            },
+            "top_recommendation_count": { "type": "integer" },
+            "override_applied": {
+              "type": "array",
+              "description": "真正改动了排序的人工决策，逐条带 category_id / from_rank / to_rank / match_key_source。"
+            },
+            "override_unmatched": {
+              "type": "array",
+              "description": "读到但没生效的 override 事件（缺 taxonomy_id / 类不在本轮 / 只有 to_rank 缺失的标记），逐条带 reason 与 debug 级 detail。空数组表示「没有未生效的人工决策」。"
+            },
+            "disclaimer": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

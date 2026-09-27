@@ -186,7 +186,9 @@ class Orchestrator:
         if self.cfg.judge_healthcheck:
             for i, j in enumerate(judges):
                 if isinstance(j, OpenAICompatJudge) and not j.healthcheck():
-                    self._degrade(Stage.SCORE, f"judge {j.name} ({j.model} @ {j.base_url})", "health check failed", "mock judge")
+                    why = getattr(j, "health_error", None) or "unknown"
+                    self._degrade(Stage.SCORE, f"judge {j.name} ({j.model} @ {j.base_url})",
+                                  f"health check failed: {why}", "mock judge")
                     judges[i] = MockJudge(j.name, f"mock-fallback-for-{j.model}", jitter=0.1)
         self.manifest["models"]["judges"] = {j.name: j.model for j in judges}
         return Panel(judges, cfg.dimensions, score_tolerance=cfg.score_tolerance, workers=cfg.workers)

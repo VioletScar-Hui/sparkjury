@@ -63,10 +63,10 @@ bash tools/verify.sh
 #   pytest 104 passed, 3 skipped ｜ validate_skills 11/11 ｜ lint_skills 11/11 ｜ pack FROZEN @3d736734…
 
 # 门禁二：治理 skill 的红线断言（不是 happy path）
-python3 skills/sparkjury-govern/scripts/run.py --selftest        # 拒无据解冻/幂等/投影
-python3 skills/sparkjury-prioritize/scripts/run.py --selftest    # 拒排/override 不静默
-python3 skills/sparkjury-clarify/scripts/run.py --selftest       # 不写 pack/五问预算
-python3 skills/sparkjury-calibrate/scripts/run.py --selftest     # 无阈值 UNKNOWN/零方差识别
+python3 skills-governance/sparkjury-govern/scripts/run.py --selftest        # 拒无据解冻/幂等/投影
+python3 skills-governance/sparkjury-prioritize/scripts/run.py --selftest    # 拒排/override 不静默
+python3 skills-governance/sparkjury-clarify/scripts/run.py --selftest       # 不写 pack/五问预算
+python3 skills-governance/sparkjury-calibrate/scripts/run.py --selftest     # 无阈值 UNKNOWN/零方差识别
 ```
 
 **在你们自己的 demo 产物上验黄金池 hook**（今天用 `runs/demo-1` 实测，`card.json` 的 clusters 直接喂会被**拒排**——这是 fail-safe；加一层显式标签映射后通）：

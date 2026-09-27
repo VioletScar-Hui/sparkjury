@@ -57,11 +57,17 @@ class OpenAICompatJudge:
                               timeout=timeout_s, max_retries=max_retries)
 
     def healthcheck(self, timeout_s: float = 3.0) -> bool:
-        """True when the endpoint answers /models (vLLM, StepFun and OpenRouter all do)."""
+        """True when the endpoint answers /models (vLLM, StepFun and OpenRouter all do).
+
+        失败原因存进 self.health_error：401（key 无效）和连接超时（网络不通）在降级
+        消息里长得一样，排查方向却完全相反——DGX 节点上实测过 StepFun key 无效被
+        误当网络问题查了一轮。"""
         try:
             self._client.with_options(timeout=timeout_s, max_retries=0).models.list()
+            self.health_error: str | None = None
             return True
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            self.health_error = f"{type(e).__name__}: {e}"
             return False
 
     def score(self, trace: Trace, dimension: Dimension) -> Verdict:

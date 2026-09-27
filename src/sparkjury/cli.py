@@ -10,11 +10,15 @@ from rich.console import Console
 from rich.table import Column, Table
 
 from sparkjury import __version__
+from sparkjury.agent.cli import agent_app
 from sparkjury.adapters import load as load_traces
 from sparkjury.models.trace import TraceSource
 from sparkjury.store import TraceStore
 
 app = typer.Typer(help="SparkJury: agent evaluation harness for DGX Spark.", no_args_is_help=True)
+
+# Agent harness 子命令（sparkjury agent ...）。逻辑在 sparkjury/agent/ 里，这里只是挂上去。
+app.add_typer(agent_app, name="agent")
 console = Console()
 # 降级提示走 stderr：`--json` 的 stdout 要能直接喂给 json.loads，混一行警告进去就解析不了。
 err_console = Console(stderr=True)

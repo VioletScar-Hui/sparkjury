@@ -36,8 +36,27 @@ class Event(BaseModel):
 Listener = Callable[[Event], None]
 
 
+def _last_seq(path: Path) -> int:
+    """读日志里最后一条的 seq。文件被写坏（半行）时退回 0，宁可重号一次也不炸。"""
+    try:
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except OSError:
+        return 0
+    if not lines:
+        return 0
+    try:
+        return int(json.loads(lines[-1]).get("seq", 0))
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return 0
+
+
 class EventBus:
-    def __init__(self, run_id: str, log_path: str | Path | None = None):
+    def __init__(self, run_id: str, log_path: str | Path | None = None, *, append: bool = False):
+        """`append=False`（默认）清空日志开一次新 run；`append=True` 接着上一次的事件流往后写。
+
+        追加模式是给「中断后接着跑」用的：恢复一次已有的 run 时把事件流清掉，等于把上次
+        跑到哪儿的证据一起删了。追加模式下 seq 从文件里最后一条接着数，不重号。
+        """
         self.run_id = run_id
         self._listeners: list[Listener] = []
         self._seq = 0
@@ -46,7 +65,10 @@ class EventBus:
         self._log = Path(log_path) if log_path else None
         if self._log:
             self._log.parent.mkdir(parents=True, exist_ok=True)
-            self._log.write_text("", encoding="utf-8")
+            if append and self._log.is_file():
+                self._seq = _last_seq(self._log)
+            else:
+                self._log.write_text("", encoding="utf-8")
 
     def subscribe(self, fn: Listener) -> None:
         self._listeners.append(fn)

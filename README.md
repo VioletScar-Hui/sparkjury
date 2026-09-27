@@ -24,7 +24,7 @@ uv run sparkjury run --demo           # 离线：4 个零售客服任务 x 3 次
 uv run sparkjury serve                # 打开 http://127.0.0.1:9000/ ，点 Run demo
 ```
 
-看板上会看到：七个阶段依次亮起，每条 trace 的打分进度，三位裁判分歧时的仲裁事件（没有 Jev key 时显示黄色的降级提示），右侧 GPU 显存和模型端点状态，底部一张证据卡片：本轮 14 条 trace，1 条环境问题被排除，5 条真 badcase 聚成 2 类，建议先修"未验证身份就执行写操作"，附代表 trace 的对话摘录和三位裁判的理由。点"PM: fix this first"，系统给出改完后回归对比的命令。
+看板上会看到：七个阶段依次亮起，每条 trace 的打分进度，三位裁判分歧时的仲裁事件（没有 Jev key 时显示黄色的降级提示），右侧 GPU 显存和模型端点状态，底部一张证据卡片：本轮 14 条 trace，1 条环境问题被排除，5 条真 badcase 聚成 2 类，建议先修"未验证身份就执行写操作"，附代表 trace 的对话摘录和三位裁判的理由。点"PM: fix this first"，系统给出改完后回归对比的命令。卡片下方是「检查台」，三个页签：裁判理由并排（点任意一条 trace，时间线里的打分行、簇成员表、卡片上的代表 trace 都能点，看三位裁判四个维度的分数与理由、仲裁结果和降级标记、对话记录里证据步骤高亮）、簇明细下钻（展开每个簇的成员明细）、回归对比（选一个更早的 run，看 pass^1 / pass^k 前后变化、修好与修坏的任务、簇的增减）。这三块以前都要切终端跑 `sparkjury verdicts` / `regress` 才能看到。界面是中文，视觉沿用 `docs/AGENT_VS_WORKFLOW.html` 的纸面加哑金风格，跟随系统深浅色，也可手动切换。
 
 ## Why DGX Spark
 
@@ -66,6 +66,8 @@ SparkJury 自己就是一个 Agent 系统，不是一条固定 pipeline：
 - **仲裁者**（`arbiter/`）只在三票不一致时介入。Jev 是 TypeSafe 的 System One 决策模型，不生成文字，只回 score / choice / bool，便宜且不瞎编；不可达时本地 Judge A 仲裁并标降级。
 - **审计**：5% 的 trace 由审计裁判全维度重打，暴露小模型的系统性漏判。
 - **人在环上**：卡片只到"建议先修哪一类"，PM 点确认后才进入改动和回归。我们不让 Agent 自己打分自己改。
+- **Harness**（`agent/`，M13）：模型也能自己动手。技能描述进 system prompt、正文按需加载，模型自己决定读哪个技能的说明书、按顺序调 `clean → score → cluster → report`。带会话树、事件流、steering / follow-up / abort，全程可回放。详见 `docs/AGENT_HARNESS.md`。
+- **可恢复**（同一层的中层）：一次 run 是一条操作，日志只追加；断了可以 `sparkjury agent resume` 接着跑——已经拿到结果的工具重放而不重跑，只有开始标记没有结果的按「状态未知」处理，不许自动重跑。超预算时把更早的历史压成一条摘要，原文一条不删。详见 `docs/AGENT_HARNESS.md`。
 
 ## Skills / Tools
 
@@ -81,6 +83,8 @@ SparkJury 自己就是一个 Agent 系统，不是一条固定 pipeline：
 | `sparkjury-regress` | 前后两次评测对比：pass^k、修好和修坏的任务、簇变化、交换顺序的成对比较 |
 
 每个 Skill 是 `sparkjury` CLI 的一个子命令，Agent 和人用同一套入口。
+
+人和 Agent 用的是同一套入口：人敲 `sparkjury score --db …`，模型敲 `run_skill` 走的是同一条命令。
 
 ## Agent Loop
 
@@ -132,7 +136,7 @@ badcase = outcome 失败，或任一维度 ≤ 1，或 safety ≤ 2。严重度�
 | 裁判一致率 | 69.2%，4 条 trace 进入仲裁 |
 | badcase | 5 条，聚成 2 簇：unauthenticated_action（3）、wrong_tool（2） |
 | 全流程耗时 | 约 2.4 秒（mock 裁判） |
-| 测试 | 136 passed、3 skipped（`uv run pytest`，2026-09-27 实测）|
+| 测试 | 205 passed、3 skipped（`uv run pytest`，2026-09-27 实测）|
 
 DGX Spark 节点上，同一份样本换成真实裁判（Qwen3-30B-A3B-FP8 + Nemotron-3.5-Lightning，第三家 StepFun 待接 key）：
 
@@ -173,6 +177,8 @@ git clone <repo> && cd sparkjury
 uv sync                                   # 约 1 分钟
 uv run pytest                             # 全绿
 uv run sparkjury run --demo               # 离线跑通，2 秒
+uv run sparkjury agent run --demo         # 模型自己读技能、自己调工具，离线 2 秒
+uv run sparkjury agent ops runs/agent-*    # 操作日志：跑到哪了、要不要恢复
 uv run sparkjury serve                    # 打开 http://127.0.0.1:9000/
 ```
 
@@ -190,13 +196,23 @@ uv run sparkjury serve                    # 打开 http://127.0.0.1:9000/
 
 ## Screenshots
 
-Cockpit（DGX 节点实机，公网端口，令牌保护）：
+Cockpit（本机 demo run，1920x1080；节点实机截图待合并部署后重拍）：
 
 ![cockpit](docs/img/cockpit.png)
+
+深色主题：
+
+![cockpit dark](docs/img/cockpit_dark.png)
 
 真实裁判产出的证据卡片（两个本地裁判 + 一个降级的第三裁判）：
 
 ![card](docs/img/card.png)
+
+检查台三块视图（本机 demo run，1920x1080）：三位裁判理由并排、簇明细下钻、两次 run 的回归对比。
+
+![verdicts](docs/img/cockpit_verdicts.png)
+![clusters](docs/img/cockpit_clusters.png)
+![regress](docs/img/cockpit_regress.png)
 
 ## Limitations
 
@@ -212,7 +228,7 @@ Cockpit（DGX 节点实机，公网端口，令牌保护）：
 
 ## Docs
 
-- `docs/ARCHITECTURE.md` / `.html`：完整架构方案（16 节，含依据来源）
+- `docs/ARCHITECTURE.md` / `.html`：完整架构方案（17 节，含依据来源）
 - `docs/TEAM.md`：分工与架构优化——谁拥有哪个产出口、通过条件是什么、谁验收
 - `docs/ONBOARDING.md`：新组员上手提示词（丢给自己的 Agent 就能接入开发）
 - `docs/MODULES.md`：12 个模块的验收记录与验证命令

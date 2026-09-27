@@ -28,15 +28,14 @@ Two tiers, two gates（门禁分层）:
 
 结构门：`python3 scripts/validate_skills.py skills`（11/11 valid，全量适用）。
 
-**五个治理 skill**（`sparkjury-arbitrate/calibrate/clarify/govern/prioritize`，手工维护，勿加入生成器）——在三件套之上再加：
+**五个治理 skill**（在 `../skills-governance/`，手工维护，勿加入生成器）——**刻意不在本目录**：M13 agent harness 只扫 `skills/`，治理 skill（含能冻结/解冻评测标准的 govern）绝不进模型工具面，README「不让 Agent 自己打分自己改」的红线由目录隔离强制。它们在三件套之上再加：
 
 - `schemas/io.schema.json` — I/O contract for the stage's artifacts (JSON Schema)
 - `evals/evals.json` — 3 registry routing/behaviour/guard cases
 - `references/` — deep protocol notes loaded on demand
 - `BENCHMARK.md` — how to benchmark this skill and what counts as pass
 
-结构门：`python3 tools/lint_skills.py --skills-dir skills --only sparkjury-arbitrate,sparkjury-calibrate,sparkjury-clarify,sparkjury-govern,sparkjury-prioritize`
-（六件套检查只对治理五个生效；给六个阶段 skill 补六件套是后续 PR 的事，此前对它们跑该 lint 会如实报缺件）。
+结构门：`python3 tools/lint_skills.py --skills-dir skills-governance`（整目录六件套）。
 仓库级检查（pyc / 禁入路径，任何状态可跑）：`python3 tools/lint_skills.py --repo-only`。
 
 

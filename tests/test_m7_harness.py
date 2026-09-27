@@ -90,6 +90,8 @@ def test_unreachable_llm_judge_is_swapped_for_mock(demo_cfg):
     assert m["status"] == "ok"
     deg = [d for d in m["degradations"] if d["component"].startswith("judge judge_b")]
     assert deg and deg[0]["fallback"] == "mock judge"
+    # 降级原因必须带具体异常（401 和网络不通的排查方向相反），不许只写 health check failed
+    assert deg[0]["reason"].startswith("health check failed: ") and len(deg[0]["reason"]) > len("health check failed: ")
     assert m["models"]["judges"]["judge_b"] == "mock-fallback-for-gemma"
     assert m["stages"]["SCORE"]["judge_errors"] == 0
     assert any(e.kind == EventKind.DEGRADED and e.stage == "SCORE" for e in events)
