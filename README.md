@@ -68,6 +68,7 @@ SparkJury 自己就是一个 Agent 系统，不是一条固定 pipeline：
 - **人在环上**：卡片只到"建议先修哪一类"，PM 点确认后才进入改动和回归。我们不让 Agent 自己打分自己改。
 - **Harness**（`agent/`，M13）：模型也能自己动手。技能描述进 system prompt、正文按需加载，模型自己决定读哪个技能的说明书、按顺序调 `clean → score → cluster → report`。带会话树、事件流、steering / follow-up / abort，全程可回放。详见 `docs/AGENT_HARNESS.md`。
 - **可恢复**（同一层的中层）：一次 run 是一条操作，日志只追加；断了可以 `sparkjury agent resume` 接着跑——已经拿到结果的工具重放而不重跑，只有开始标记没有结果的按「状态未知」处理，不许自动重跑。超预算时把更早的历史压成一条摘要，原文一条不删。详见 `docs/AGENT_HARNESS.md`。
+- **接口、权限与子 agent**（同一层的上层）：三种接口各对一类用法——`--print` 只吐最后那段回答给脚本、`--events` 每行一条 JSON 事件给看板、`agent rpc` 常驻进程跑着的时候还能插话和喊停。权限分 `plan`（只读）/ `safe`（默认：有人在场就问、没人接手就放行但记账）/ `yolo`，三种模式都拦节点手册的红线，每个工具是只读还是改东西由工具自己声明。`task` 工具能把一件独立的事派给子 agent，子 run 有独立目录与会话，权限沿用父的，失败记进父 manifest 的降级项。详见 `docs/AGENT_HARNESS.md`。
 
 ## Skills / Tools
 
@@ -136,7 +137,7 @@ badcase = outcome 失败，或任一维度 ≤ 1，或 safety ≤ 2。严重度�
 | 裁判一致率 | 69.2%，4 条 trace 进入仲裁 |
 | badcase | 5 条，聚成 2 簇：unauthenticated_action（3）、wrong_tool（2） |
 | 全流程耗时 | 约 2.4 秒（mock 裁判） |
-| 测试 | 205 passed、3 skipped（`uv run pytest`，2026-09-27 实测）|
+| 测试 | 257 passed、3 skipped（`uv run pytest`，2026-09-27 实测）|
 
 DGX Spark 节点上，同一份样本换成真实裁判（Qwen3-30B-A3B-FP8 + Nemotron-3.5-Lightning，第三家 StepFun 待接 key）：
 
@@ -179,6 +180,8 @@ uv run pytest                             # 全绿
 uv run sparkjury run --demo               # 离线跑通，2 秒
 uv run sparkjury agent run --demo         # 模型自己读技能、自己调工具，离线 2 秒
 uv run sparkjury agent ops runs/agent-*    # 操作日志：跑到哪了、要不要恢复
+uv run sparkjury agent policy              # 三种权限模式下每个工具怎么判
+uv run sparkjury agent rpc                 # 常驻接口：stdin 一行一条 JSON 命令
 uv run sparkjury serve                    # 打开 http://127.0.0.1:9000/
 ```
 

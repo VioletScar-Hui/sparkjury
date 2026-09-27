@@ -465,7 +465,7 @@ uv run --group ops python scripts/node.py run "nvidia-smi"    # 会提示输入�
 ## M13 Agent harness（2026-09-27）
 
 **做了什么**
-- 参照 pi（earendil-works/pi）的 harness 分层，新增 `src/sparkjury/agent/`：`ai.py`（四个本地端点 + 云端共用一个 `complete()`，带工具调用与 usage）、`tools.py`（工具注册表 + 六个技能按需加载与执行 + 两个只读文件工具）、`loop.py`（agent loop 与 steering / follow-up / abort）、`session.py`（只追加、带 parent 指针的会话树）、`runtime.py`（run 目录、事件流、用量账本、manifest）、`cli.py`（`sparkjury agent run / tools / replay / endpoints`）。
+- 参照 pi（earendil-works/pi）的 harness 分层，新增 `src/sparkjury/agent/`：`ai.py`（四个本地端点 + 云端共用一个 `complete()`，带工具调用与 usage）、`tools.py`（工具注册表 + 六个技能按需加载与执行 + 三个只读文件工具）、`loop.py`（agent loop 与 steering / follow-up / abort）、`session.py`（只追加、带 parent 指针的会话树）、`runtime.py`（run 目录、事件流、用量账本、manifest）、`cli.py`（`sparkjury agent run / tools / replay / endpoints`）。
 - 两条决定行为的规矩：技能正文不进 system prompt，只放一句话描述，模型要看细节自己调 `load_skill`；工具失败是消息不是崩溃（记一笔失败，收尾进 manifest 的 `degradations`）。
 - 事件流复用 M7 的 `EventBus`（`stage=AGENT`），run 落在 `runs/agent-*/`：`session.jsonl` / `events.jsonl` / `usage.jsonl` / `manifest.json`。
 - 新文档 `docs/AGENT_HARNESS.md`；README 的 Agent System、Skills、Quick Start 三处补入口。
@@ -478,13 +478,32 @@ uv run --group ops python scripts/node.py run "nvidia-smi"    # 会提示输入�
 工具执行前可拦下、执行后与每轮结束可观察）。四个原语 `accept` / `drive` / `request_abort` / `inspect`
 落在 runtime 上，命令行是 `agent ops` / `agent resume` / `agent compact`。
 
-**自测结果**：`uv run pytest tests/test_m13_agent.py tests/test_m13_durable.py -q` 65 个用例全绿（全离线：脚本模型 + 离线执行器，不联网不起子进程）。`uv run sparkjury agent run --demo` 端到端 5 轮 4 次工具调用，结束方式 `end_turn`，manifest 无降级项。
+**上层（同一天再补一层）**：pi 的 coding agent 有五种接口，另外它明确不要权限系统（靠容器兜底）——
+这台节点上两样都得自己补。`perms.py` 做权限与留痕：`plan` 只读、`safe`（默认）有人在场就问一句、
+没人接手就放行但记账、`yolo` 全放行，三种模式都拦节点手册里的红线（不许重启、不许探测内网等）；
+工具是只读还是改东西由 `ToolSpec.readonly` 自己声明，没声明的一律按会改东西处理。
+`iface.py` 补三种非交互接口：`--print` 只吐最后那段回答、`--events` 每行一条 JSON 事件（NDJSON）、
+`agent rpc` 常驻进程（stdin 读 prompt / steer / followup / abort / inspect / policy / ping / shutdown，
+stdout 写事件与回执，跑 run 的活在工作线程里，所以跑着的时候插话和喊停都收得到）。
+`spawn.py` 补子 agent：`task` 工具把一件独立的事派给另一个 run，子 run 有独立的会话、事件流、用量账本
+与 manifest，落在父 run 的 `children/` 下；默认只深一层（子 agent 的工具表里没有 `task`），权限沿用
+父的那一份，子 agent 出事记成父 manifest 的降级项而不是把父 run 带崩。manifest 因此多了 `permissions`
+与 `subagents` 两栏账。
+
+**顺手修的两处循环语义**：abort 在模型回答那一轮里到达时，结束方式如实记成 `aborted`（以前会记成
+`end_turn`，看起来像自然跑完）；steering 在最后那一轮回答期间到达时，循环会再跑一轮把它冲成一条
+user 消息（以前会随 end_turn 一起丢掉）。
+
+**自测结果**：`uv run pytest tests/test_m13_agent.py tests/test_m13_durable.py tests/test_m13_toplayer.py -q` 116 个用例全绿（全离线：脚本模型 + 离线执行器，不联网不起子进程）。`uv run sparkjury agent run --demo` 端到端 5 轮 4 次工具调用，结束方式 `end_turn`，manifest 无降级项；`agent policy` 一次列清三种模式下每个工具的处置与全部红线。
 
 **验证**
 ```bash
-uv run pytest tests/test_m13_agent.py -q
+uv run pytest tests/test_m13_agent.py tests/test_m13_durable.py tests/test_m13_toplayer.py -q
 uv run sparkjury agent tools
+uv run sparkjury agent policy
 uv run sparkjury agent run --demo
+uv run sparkjury agent run --demo --print          # 只留最后那段回答
+uv run sparkjury agent run --demo --events         # 每行一条 JSON 事件
 ```
 
 ---

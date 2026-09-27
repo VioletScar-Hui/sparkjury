@@ -30,7 +30,9 @@ from sparkjury.agent.compact import CompactionPolicy, Compactor
 from sparkjury.agent.hooks import Hooks
 from sparkjury.agent.loop import STOPPED_ABORTED, AgentLoop, LoopResult, default_system_prompt
 from sparkjury.agent.ops import Operation, OperationKind, OperationLog, OperationStatus
+from sparkjury.agent.perms import PermissionPolicy
 from sparkjury.agent.session import SessionTree
+from sparkjury.agent.spawn import SubagentRunner
 from sparkjury.agent.store import RunStore, StoreError, atomic_write_json
 from sparkjury.agent.tools import SkillInfo, ToolRegistry, load_skill_tools
 from sparkjury.harness.events import EventBus
@@ -79,7 +81,10 @@ class AgentRuntime:
                  skills_root: str | Path | None = None, max_turns: int = 12,
                  system_prompt: str | None = None, session_path: Path | None = None,
                  store: RunStore | None = None, compaction: CompactionPolicy | None = None,
-                 hooks: Hooks | None = None, use_model_summary: bool = True):
+                 hooks: Hooks | None = None, use_model_summary: bool = True,
+                 permissions: PermissionPolicy | None = None, subagents: bool = True,
+                 subagent_factory: Any | None = None, subagent_max_depth: int = 1,
+                 subagent_max_turns: int = 6):
         self.workdir = Path(workdir or Path.cwd()).resolve()
         if run_dir is not None:                      # 重新打开一次已有的 run：目录已经在那儿了
             self.run_dir = Path(run_dir)
@@ -104,13 +109,28 @@ class AgentRuntime:
         self.provider = provider
         self.max_turns = max_turns
         self.hooks = hooks or Hooks()
-        self.system_prompt = system_prompt or default_system_prompt(registry, self.skills, workdir=self.workdir)
+        # 权限层挂在钩子的最前面：拦截要发生在别的 before_tool 之前，否则「先跑一半再拦」没有意义。
+        self.permissions = permissions
+        if permissions is not None:
+            permissions.bind(self.registry)
+            self.hooks.before_tool.insert(0, permissions.hook())
+        self.system_prompt = system_prompt
         self.compactor = Compactor(policy=compaction or CompactionPolicy(), provider=provider,
                                    bus=self.bus, ops=self.ops, use_model=use_model_summary)
         self.run = AgentRun(run_id=self.run_id, run_dir=self.run_dir, session=self.session, bus=self.bus,
                             provider=provider, registry=registry, skills=self.skills,
                             ledger_path=self.store.paths.ledger,
                             started_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        # 子 agent 的工具要在算 system prompt 之前注册——prompt 里那份工具清单是构造时抓的，
+        # 晚一步注册，模型就看不见 task 这个工具了。
+        self.subagents: SubagentRunner | None = None
+        if subagents:
+            self.subagents = SubagentRunner(self, factory=subagent_factory, max_depth=subagent_max_depth,
+                                            max_turns=subagent_max_turns, permissions=permissions)
+            if self.subagents.can_spawn and "task" not in self.registry.names():
+                self.registry.register(self.subagents.tool_spec())
+        if self.system_prompt is None:
+            self.system_prompt = default_system_prompt(registry, self.skills, workdir=self.workdir)
         self.turns: list[dict[str, Any]] = []
         self.operation: Operation | None = None
 
@@ -270,6 +290,18 @@ class AgentRuntime:
             degradations.append("run aborted by caller")
         if result.replayed_calls:
             degradations.append(f"{result.replayed_calls} tool call(s) replayed from the journal on resume")
+        permissions = self.permissions.report() if self.permissions is not None else None
+        if permissions and permissions["denied"]:
+            degradations.append(f"{permissions['denied']} tool call(s) denied by policy")
+        subagents = self.subagents.report() if self.subagents is not None else []
+        for record in subagents:
+            if not record["ok"]:
+                # 子 agent 没干完：它自己的失败已经在下面这一行里说清了，不用再把子 run 的
+                # 「模型调用失败」原样抄一遍——同一件事写三遍，读的人只会以为出了三回事。
+                degradations.append(f"subagent {record['run_id']} {record['stopped']}"
+                                    + (f": {record['error']}" if record["error"] else ""))
+                continue
+            degradations.extend(record["degradations"])
         ops = self.ops.operations()
         ledger_total = self.store.ledger.total()
         manifest = {
@@ -298,6 +330,8 @@ class AgentRuntime:
             "usage": dict(result.usage) or ledger_total,
             "operations": [{"id": op.id, "kind": str(op.kind), "status": str(op.status),
                             "records": op.records, "detail": op.detail} for op in ops],
+            "permissions": permissions,
+            "subagents": subagents,
             "degradations": degradations,
         }
         atomic_write_json(self.store.paths.manifest, manifest)

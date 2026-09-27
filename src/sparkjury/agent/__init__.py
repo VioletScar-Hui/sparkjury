@@ -5,15 +5,19 @@
 
 分四层，各管一段，谁也不知道底下是谁：
 
-    cli.py       命令行入口（agent run / tools / replay）
+    cli.py / iface.py   接口：命令行、一行文本、NDJSON 事件流、长驻 RPC
+    perms.py            权限：只读放行、写操作审批或记账、红线永远拦
+    spawn.py            子 agent：把一件独立的事派给另一个 run 去做
     runtime.py   装配 + 落盘：run 目录、events.jsonl、session.jsonl、usage.jsonl、manifest.json
+    ops.py / store.py / compact.py / hooks.py   操作状态机、三个存储、历史压缩、钩子
     loop.py      循环：消息 → 模型 → 工具 → 结果，外加 steering / follow-up / abort
     ai.py        模型：四个本地端点 + 云端，一次调用拿到文本和工具调用
-    tools.py     工具：六个技能按需加载与执行 + 两个只读文件工具
+    tools.py     工具：六个技能按需加载与执行 + 三个只读工具 + task
     session.py   会话树：只追加的 JSONL，带 parent 指针，可分支、可回放
 
-参照的是 pi（earendil-works/pi）的 harness 分层，但只做到最小闭环：不压缩历史、不做操作
-状态机、不跨进程恢复在跑的 run。要的就是「模型真的调起了技能，全过程看得见、能中断、能回放」。
+参照的是 pi（earendil-works/pi）的 harness 分层，三层都齐了：最小闭环（能跑能看能回放）、
+中层（能恢复、能压缩、能挂钩子）、上层（四种接口、权限、子 agent）。刻意没做的写在
+`docs/AGENT_HARNESS.md` 末尾：token 级流式、多进程锁、跨机器恢复、工具幂等键。
 """
 
 from sparkjury.agent.ai import (
@@ -48,6 +52,25 @@ from sparkjury.agent.compact import (
     plan_compaction,
 )
 from sparkjury.agent.hooks import Hooks
+from sparkjury.agent.iface import (
+    RPC_OPS,
+    EventStream,
+    RpcSession,
+    StreamWriter,
+    event_payload,
+    final_text,
+    result_payload,
+    run_with_events,
+)
+from sparkjury.agent.perms import (
+    BUILTIN_READONLY,
+    RED_LINES,
+    Decision,
+    PermissionMode,
+    PermissionPolicy,
+    Verdict,
+)
+from sparkjury.agent.spawn import CHILDREN_DIR, SubagentRecord, SubagentRunner, task_tool_spec
 from sparkjury.agent.ops import (
     TERMINAL_STATUSES,
     Operation,
@@ -89,6 +112,10 @@ __all__ = [
     "CompactionPlan", "CompactionPolicy", "Compactor", "apply_compaction",
     "deterministic_summary", "model_summary", "plan_compaction",
     "Hooks",
+    "RPC_OPS", "EventStream", "RpcSession", "StreamWriter", "event_payload", "final_text",
+    "result_payload", "run_with_events",
+    "BUILTIN_READONLY", "RED_LINES", "Decision", "PermissionMode", "PermissionPolicy", "Verdict",
+    "CHILDREN_DIR", "SubagentRecord", "SubagentRunner", "task_tool_spec",
     "TERMINAL_STATUSES", "Operation", "OperationKind", "OperationLog", "OperationStatus",
     "Ledger", "RunStore", "StoreError", "StorePaths", "Transaction", "ValuesStore",
     "atomic_write_json", "read_jsonl",

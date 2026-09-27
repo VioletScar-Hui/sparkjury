@@ -108,6 +108,9 @@ class ToolSpec:
     parameters: dict[str, Any]
     handler: Callable[[dict[str, Any]], str]
     source: str = "builtin"
+    #: 会不会改东西。权限层照这个判：True 直接放行，False 要过审批或至少记一笔。
+    #: 默认 False 是故意的——没声明的工具按「会改东西」处理，宁可多问一句。
+    readonly: bool = False
 
     def to_payload(self) -> dict[str, Any]:
         return {"type": "function",
@@ -296,7 +299,7 @@ def load_skill_tools(root: Path | None = None, *, executor: Callable[[SkillInfo,
             parameters={"type": "object", "properties": {
                 "name": {"type": "string", "description": "技能名", "enum": names},
             }, "required": ["name"]},
-            handler=load_skill, source="skills",
+            handler=load_skill, source="skills", readonly=True,
         ),
         ToolSpec(
             name="run_skill",
@@ -314,14 +317,14 @@ def load_skill_tools(root: Path | None = None, *, executor: Callable[[SkillInfo,
             description="列工作目录下的文件。路径相对工作目录，不能跑到外面去。",
             parameters={"type": "object", "properties": {"path": {"type": "string", "description": "相对路径，默认 ."}},
                         "required": []},
-            handler=list_dir, source="local",
+            handler=list_dir, source="local", readonly=True,
         ),
         ToolSpec(
             name="read_file",
             description="读工作目录下的一个文本文件（只读，路径不能越出工作目录）。",
             parameters={"type": "object", "properties": {"path": {"type": "string", "description": "相对路径"}},
                         "required": ["path"]},
-            handler=read_file, source="local",
+            handler=read_file, source="local", readonly=True,
         ),
     ])
     return registry, skills

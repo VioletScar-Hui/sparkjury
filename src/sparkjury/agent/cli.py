@@ -1,17 +1,22 @@
 """`sparkjury agent` 子命令：跑一次、看工具清单、回放一次会话。
 
-三个命令都刻意做得薄——真正的逻辑在 runtime / loop / tools 里，命令行只负责组装参数和
+命令都刻意做得薄——真正的逻辑在 runtime / loop / tools 里，命令行只负责组装参数和
 把结果摆成人看得懂的样子。
 
-    sparkjury agent tools          # 注册表里有什么：六个技能 + 两个本地工具
+    sparkjury agent tools          # 注册表里有什么：六个技能 + 三个只读工具 + task
+    sparkjury agent policy         # 三种权限模式下每个工具怎么判
     sparkjury agent run --demo     # 离线跑一通（脚本模型 + 离线执行器），两秒完事
     sparkjury agent run -p "……" --model subject
+    sparkjury agent run -p "……" --print      # 只把最后那段回答吐出来，方便接到脚本里
+    sparkjury agent run -p "……" --events     # 每冒一条事件写一行 JSON（NDJSON）
+    sparkjury agent rpc            # 常驻：stdin 一行一条 JSON 命令
     sparkjury agent replay runs/agent-*/session.jsonl
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import typer
@@ -20,9 +25,12 @@ from rich.table import Table
 
 from sparkjury.agent.ai import ScriptedProvider, describe_endpoints, resolve_model, text_turn, tool_turn
 from sparkjury.agent.compact import CompactionPolicy, Compactor, deterministic_summary, plan_compaction
+from sparkjury.agent.iface import RpcSession, StreamWriter, final_text, run_with_events
 from sparkjury.agent.loop import STOPPED_ABORTED, LoopResult
+from sparkjury.agent.perms import RED_LINES, PermissionMode, PermissionPolicy
 from sparkjury.agent.runtime import AgentRuntime, load_manifest
 from sparkjury.agent.session import SessionTree
+from sparkjury.agent.spawn import task_tool_spec
 from sparkjury.agent.tools import OfflineSkillExecutor, load_skill_tools
 
 agent_app = typer.Typer(help="Agent harness: 让模型自己读技能、自己调工具。", no_args_is_help=True)
@@ -60,16 +68,28 @@ def demo_provider() -> ScriptedProvider:
     ])
 
 
+def build_policy(mode: str, *, ask: bool = False) -> PermissionPolicy:
+    """默认 `safe`：只读直接放行，会改东西的有人在场就问一句，没人接手就放行并记账。"""
+    approver = None
+    if ask:
+        def approver(_call, question: str) -> bool:  # type: ignore[misc]
+            return typer.confirm(question, default=False)
+
+    return PermissionPolicy(mode=mode, approver=approver)
+
+
 def build_runtime(prompt: str | None, *, model: str | None, max_turns: int, runs_dir: str,
                   workdir: Path, demo: bool, session: Path | None,
-                  compact_budget: int = 0) -> AgentRuntime:
+                  compact_budget: int = 0, permissions: PermissionPolicy | None = None,
+                  subagents: bool = True, subagent_depth: int = 1) -> AgentRuntime:
     executor = OfflineSkillExecutor(DEMO_REPLIES) if demo else None
     provider = demo_provider() if demo else _real_provider(model)
     return AgentRuntime(provider, runs_dir=runs_dir, workdir=workdir, executor=executor,
                         max_turns=max_turns, session_path=session,
                         # 离线 demo 没有真模型可问摘要，用确定性兜底，别白跑一轮
                         compaction=CompactionPolicy(max_prompt_tokens=compact_budget),
-                        use_model_summary=not demo)
+                        use_model_summary=not demo, permissions=permissions, subagents=subagents,
+                        subagent_max_depth=subagent_depth)
 
 
 def _real_provider(model: str | None):
@@ -86,6 +106,8 @@ def tools_cmd(
 ) -> None:
     """列出注册表：每个工具叫什么、给模型看的一句描述、参数长什么样。"""
     registry, skills = load_skill_tools(skills_root, executor=OfflineSkillExecutor())
+    if "task" not in registry.names():
+        registry.register(task_tool_spec(lambda _args: "（这里只列清单，不真的跑）"))
     if as_json:
         print_json({"tools": registry.payload(),
                     "skills": [{"name": s.name, "description": s.description, "path": str(s.path)}
@@ -102,6 +124,68 @@ def tools_cmd(
                   f"system prompt 里只放这些技能的一句话描述，正文由 load_skill 按需取[/dim]")
 
 
+@agent_app.command("policy")
+def policy_cmd(
+    skills_root: Path | None = typer.Option(None, "--skills-root", help="技能目录，默认仓库里的 skills/"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """三种权限模式下每个工具会被怎么判——连同红线，一次看全。"""
+    registry, _skills = load_skill_tools(skills_root, executor=OfflineSkillExecutor())
+    if "task" not in registry.names():   # 真跑时是 runtime 注册的，这里补上，免得清单看着少一个
+        registry.register(task_tool_spec(lambda _args: "（这里只列判定，不真的跑）"))
+    names = registry.names()
+    modes = [PermissionMode.PLAN, PermissionMode.SAFE, PermissionMode.YOLO]
+    policies = {}
+    for mode in modes:
+        policy = PermissionPolicy(mode=mode)
+        policy.bind(registry)
+        policies[str(mode)] = dict(policy.preview(names))
+    if as_json:
+        print_json({"modes": {m: {n: {"allow": d.allow, "verdict": d.kind, "reason": d.reason}
+                                  for n, d in policies[m].items()} for m in policies},
+                    "default": str(PermissionMode.SAFE),
+                    "redlines": [{"needle": needle, "why": why} for needle, why in RED_LINES]})
+        return
+    table = Table(title="权限判定（默认 safe）", show_lines=False)
+    table.add_column("工具", style="bold")
+    for mode in modes:
+        table.add_column(str(mode))
+    for name in names:
+        cells = []
+        for mode in modes:
+            decision = policies[str(mode)][name]
+            cells.append("[green]放行[/green]" if decision.allow else f"[yellow]{decision.reason[:14]}…[/yellow]")
+        table.add_row(name, *cells)
+    console.print(table)
+    console.print("[dim]plan 只读不写；safe 有人在场就问一句、没人接手就放行但记账；"
+                  "yolo 全放行。红线三种模式都拦，没有开关。[/dim]")
+    console.print("红线：" + "、".join(f"{needle}（{why}）" for needle, why in RED_LINES))
+
+
+@agent_app.command("rpc")
+def rpc_cmd(
+    model: str = typer.Option("subject", "--model", "-m"),
+    max_turns: int = typer.Option(12, "--max-turns"),
+    runs_dir: str = typer.Option("runs", "--runs-dir"),
+    workdir: Path = typer.Option(Path("."), "--workdir"),
+    demo: bool = typer.Option(False, "--demo", help="用脚本模型：喂什么命令都按固定剧本回，不联网"),
+    permissions: str = typer.Option("safe", "--permissions"),
+    ask: bool = typer.Option(False, "--ask"),
+    no_subagents: bool = typer.Option(False, "--no-subagents"),
+    no_events: bool = typer.Option(False, "--no-events", help="不推事件流，只回执（默认推）"),
+) -> None:
+    """常驻接口：stdin 一行一条 JSON 命令，stdout 一行一条 JSON 事件与回执。
+
+    命令：prompt / steer / followup / abort / inspect / policy / ping / shutdown。
+    跑 run 的活在别的线程里，所以跑着的时候插话（steer）和喊停（abort）都收得到。
+    """
+    policy = build_policy(permissions, ask=ask)
+    runtime = build_runtime(None, model=model, max_turns=max_turns, runs_dir=runs_dir, workdir=workdir,
+                            demo=demo, session=None, permissions=policy, subagents=not no_subagents)
+    session = RpcSession(runtime, emit_events=not no_events, max_turns=max_turns)
+    raise typer.Exit(code=session.serve())
+
+
 @agent_app.command("run")
 def run_cmd(
     prompt: str | None = typer.Option(None, "--prompt", "-p", help="要它干的事；--demo 时可以不给"),
@@ -114,28 +198,49 @@ def run_cmd(
     session: Path | None = typer.Option(None, "--session", help="续用一份已有的 session.jsonl"),
     compact_budget: int = typer.Option(0, "--compact-budget",
                                         help="prompt 超过这么多 token 就把更早的历史压成摘要；0 表示不压"),
+    permissions: str = typer.Option("safe", "--permissions",
+                                    help="plan（只读）/ safe（默认，写操作有人就问、没人就记账）/ yolo（全放行）"),
+    ask: bool = typer.Option(False, "--ask", help="safe 模式下把批准通道接上：每个会改东西的工具都问一句"),
+    no_subagents: bool = typer.Option(False, "--no-subagents", help="不给这次 run 装 task（子 agent）工具"),
+    subagent_depth: int = typer.Option(1, "--subagent-depth", help="子 agent 最多再往下派几层"),
+    print_only: bool = typer.Option(False, "--print", help="只把最后那段回答写到 stdout，别的都不打"),
+    events: bool = typer.Option(False, "--events", help="事件流按行输出 JSON（NDJSON），收尾补一行 result"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """跑一次 agent run。结果落在 runs/<run_id>/，manifest.json 里能看降级项。"""
     if not prompt and not demo:
         console.print("[red]要么给 --prompt，要么加 --demo。[/red]")
         raise typer.Exit(code=2)
+    if print_only and events:
+        console.print("[red]--print 和 --events 只能选一个：一个只留最后那段回答，一个要全程的事件。[/red]")
+        raise typer.Exit(code=2)
+    policy = build_policy(permissions, ask=ask)
     runtime = build_runtime(prompt, model=model, max_turns=max_turns, runs_dir=runs_dir,
                             workdir=workdir, demo=demo, session=session,
-                            compact_budget=compact_budget)
-    if not as_json:
+                            compact_budget=compact_budget, permissions=policy,
+                            subagents=not no_subagents, subagent_depth=subagent_depth)
+    if not (as_json or print_only or events):
         spec = runtime.provider.spec
         console.print(f"[bold]agent run[/bold] {runtime.run_id}")
         console.print(f"模型 [cyan]{spec.name}[/cyan] / {spec.model} @ {spec.base_url}"
                       f"｜轮数上限 {max_turns}{'｜离线 demo' if demo else ''}")
+        console.print(f"权限 [cyan]{policy.mode}[/cyan]"
+                      f"｜工具 {', '.join(runtime.registry.names())}")
     try:
+        if events:
+            # 事件走 stdout（一行一条 JSON），所以下面的结束方式表格一律不打——混在一起就没人能解析了
+            result = run_with_events(runtime, prompt or DEMO_PROMPT,
+                                     writer=StreamWriter(sys.stdout))
+            raise typer.Exit(code=0 if result.ok else 1)
         result = runtime.start(prompt or DEMO_PROMPT)
     except KeyboardInterrupt:  # pragma: no cover - 交互时才发生（工具子进程里按 Ctrl-C）
         console.print("\n[yellow]收到中断：已跑完的记录保留，正在收尾。[/yellow]")
         result = LoopResult(stopped=STOPPED_ABORTED, turns=len(runtime.turns),
                             session_id=runtime.session.session_id)
         runtime.write_manifest(result)
-    if as_json:
+    if print_only:
+        console.print(final_text(runtime, result), markup=False, soft_wrap=True, highlight=False)
+    elif as_json:
         print_json(json.loads(runtime.run.manifest_path.read_text(encoding="utf-8")))
     else:
         console.print()

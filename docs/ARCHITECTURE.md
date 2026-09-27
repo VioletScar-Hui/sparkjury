@@ -177,6 +177,9 @@ sparkjury/
 │   │   ├── ops.py                #   操作状态机：run / compaction / navigation
 │   │   ├── compact.py            #   历史压缩：摘要顶替更老的消息
 │   │   ├── hooks.py              #   四个挂点（请求前、工具前后、每轮结束）
+│   │   ├── perms.py              #   权限：只读放行、写操作审批或记账、红线永远拦
+│   │   ├── iface.py              #   一点文本 / NDJSON 事件流 / 长驻 RPC 三种接口
+│   │   ├── spawn.py              #   子 agent：把一件独立的事派给另一个 run
 │   │   ├── runtime.py            #   run 目录、事件流、用量账本、操作日志、manifest
 │   │   └── cli.py                #   sparkjury agent 子命令
 │   └── cli.py                    # 所有 Skill 的命令入口
@@ -241,7 +244,7 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 | M10 | DGX 部署 + τ²-bench 跑数 + 演示数据 | P0 | 脚本与 token 已完成，18 个用例；节点上执行待做 |
 | M11 | README / 征文 / 视频脚本 | P0 | 初稿已完成，2 个用例；截图、真实数字、录制待补 |
 | M12 | 跨平台与仓库约定守卫 | P1 | 已完成，17 个用例 |
-| M13 | Agent harness（模型自己调技能 + 可恢复） | P1 | 已完成，65 个用例 |
+| M13 | Agent harness（模型自己调技能 + 可恢复 + 接口与权限） | P1 | 已完成，117 个用例 |
 
 「N 个用例」指该模块测试文件被收集到的用例数（不是通过数），有跳过的在括号里注明。
 这张表由 `scripts/certificate.py` 逐行核对，改测试不改表会红。
@@ -461,7 +464,7 @@ M13 补这一层，参照 pi（earendil-works/pi）的 harness 分层，只做�
 | 层 | 文件 | 管什么 |
 |---|---|---|
 | 模型 | `agent/ai.py` | 四个本地端点 + 云端共用一个 `complete()`；换模型只换 `--model` |
-| 工具 | `agent/tools.py` | 工具注册表；六个技能按需加载（`load_skill`）与执行（`run_skill`），加两个只读文件工具 |
+| 工具 | `agent/tools.py` | 工具注册表；六个技能按需加载（`load_skill`）与执行（`run_skill`），加三个只读文件工具 |
 | 循环 | `agent/loop.py` | 消息 → 模型 → 工具 → 结果；steering / follow-up / abort 三个打断口 |
 | 会话 | `agent/session.py` | 只追加的 `session.jsonl`，每条带 parent 指针，可分支、可回放 |
 | 装配 | `agent/runtime.py` | run 目录、事件流、用量账本、manifest |
@@ -486,11 +489,24 @@ durable 那一段：
 四个原语对应关系：`accept`（建操作）、`drive`（推进）、`request_abort`（中断）、`inspect`
 （看现场）。命令行是 `sparkjury agent ops <run_dir>`（现场 + 操作日志）、`agent resume <run_dir>`
 （接着跑）、`agent compact <session.jsonl>`（压缩，默认只试算），`agent run` 多了
-`--compact-budget`。详见 `docs/AGENT_HARNESS.md`。
+`--compact-budget`。
+
+**上层：接口、权限、子 agent**。pi 的 coding agent 有五种接口和一个权限缺口（它靠容器兜底），
+这台节点上两样都得自己补：
+
+| 补的东西 | 文件 | 解决了什么 |
+|---|---|---|
+| 三种接口 | `agent/iface.py` | `--print` 只吐最后那段回答给脚本；`--events` 每行一条 JSON 事件给看板与管道；`agent rpc` 常驻，stdin 读命令、stdout 写事件，跑着的时候也收得到 steer 与 abort |
+| 权限与留痕 | `agent/perms.py` | `plan` 只读、`safe`（默认）有人就问没人就记账、`yolo` 全放行；三条模式都拦节点红线；每个工具是只读还是改东西由 `ToolSpec.readonly` 自己声明 |
+| 子 agent | `agent/spawn.py` | `task` 工具把一件独立的事派给另一个 run：子 run 有独立的会话、事件流、用量与 manifest，落在父 run 的 `children/` 下，默认只深一层 |
+
+`manifest.json` 因此多了两栏账：`permissions`（模式、次数、逐条记录，包括「无人值守放行」几次）
+和 `subagents`（每次派活的子 run、结束方式、结论、降级项）。子 agent 出事不会把父 run 带崩，
+但会被记成父 manifest 的降级项——**失败不美化**这条规矩在跨 run 时同样成立。
 
 ## 17. 当前进度与验证方法
 
-M1 到 M13 已完成（M10 节点执行、M11 录制待做），205 个 pytest 用例通过。一条命令跑通全流程：
+M1 到 M13 已完成（M10 节点执行、M11 录制待做），257 个 pytest 用例通过。一条命令跑通全流程：
 
 ```
 cd sparkjury

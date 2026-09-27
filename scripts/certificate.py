@@ -201,7 +201,7 @@ MODULE_FILES = {
     "M10": ["test_m10_deploy.py"],
     "M11": ["test_m11_docs.py"],
     "M12": ["test_m12_crossplatform.py", "test_ablation.py"],
-    "M13": ["test_m13_agent.py", "test_m13_durable.py"],
+    "M13": ["test_m13_agent.py", "test_m13_durable.py", "test_m13_toplayer.py"],
 }
 
 

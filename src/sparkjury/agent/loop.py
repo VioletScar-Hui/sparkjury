@@ -198,10 +198,23 @@ class AgentLoop:
             if turn.thinking:
                 answer["thinking"] = turn.thinking
             self.session.append("message", role="assistant", data=answer)
+            if self._aborted:
+                # 中断是在模型回答的这一轮里到达的。回答已经落盘（不删），但结束方式如实记成中断——
+                # 记成 end_turn 会让人以为这次是自然跑完的。
+                result.stopped = STOPPED_ABORTED
+                self.session.append("note", data={"text": "这一轮回答期间收到中断请求，run 以中断收尾",
+                                                  "level": "warn"})
+                self._publish(EventKind.WARNING, "模型回答期间收到中断，run 以中断收尾")
+                break
             if self._followups:
                 text = self._followups.pop(0)
                 self.session.append("message", role="user", data={"text": text, "followup": True})
                 self._publish(EventKind.PROGRESS, "收到 follow-up，继续跑", phase="followup")
+                continue
+            if self._steering:
+                # 插话是在这一轮回答期间到的。它出现在「这一轮之后」，所以不能就这么收尾——
+                # 上面那圈循环开头会把它冲成一条 user 消息，这一轮白说的话就白说了。
+                self._publish(EventKind.PROGRESS, "收到 steering，继续跑", phase="steering")
                 continue
             result.stopped = STOPPED_END_TURN
             break

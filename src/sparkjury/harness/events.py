@@ -73,6 +73,13 @@ class EventBus:
     def subscribe(self, fn: Listener) -> None:
         self._listeners.append(fn)
 
+    def unsubscribe(self, fn: Listener) -> None:
+        """摘掉一个订阅者。已经摘过就当没这回事——收尾时不该因为重复摘而报错。"""
+        try:
+            self._listeners.remove(fn)
+        except ValueError:
+            pass
+
     def publish(self, kind: EventKind, message: str = "", *, stage: str | None = None, **data: Any) -> Event:
         with self._lock:
             self._seq += 1

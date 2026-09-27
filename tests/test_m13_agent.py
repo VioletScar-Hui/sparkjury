@@ -350,7 +350,8 @@ def test_runtime_writes_manifest_events_and_usage(tmp_path: Path):
     manifest = json.loads(runtime.run.manifest_path.read_text(encoding="utf-8"))
     assert manifest["kind"] == "agent" and manifest["status"] == "ok"
     assert manifest["stopped"] == STOPPED_END_TURN and manifest["turns"] == 2
-    assert manifest["tools"] == ["load_skill", "run_skill", "list_dir", "read_file"]
+    # task 是 runtime 自己挂上去的（子 agent 那一层），注册表里本来那四个还在原位
+    assert manifest["tools"] == ["load_skill", "run_skill", "list_dir", "read_file", "task"]
     assert len(manifest["skills"]) == 6
     # system + user + tool_call + 「开始执行」标记 + tool_result + 最终回答
     assert manifest["session"]["entries"] == 6
@@ -400,7 +401,8 @@ def test_cli_agent_tools_and_endpoints_are_listable():
     tools = runner.invoke(app, ["agent", "tools", "--json"])
     assert tools.exit_code == 0, tools.output
     payload = json.loads(tools.stdout)
-    assert {t["function"]["name"] for t in payload["tools"]} == {"load_skill", "run_skill", "list_dir", "read_file"}
+    assert {t["function"]["name"] for t in payload["tools"]} == {"load_skill", "run_skill", "list_dir",
+                                                                "read_file", "task"}
     assert len(payload["skills"]) == 6
     endpoints = runner.invoke(app, ["agent", "endpoints", "--json"])
     assert endpoints.exit_code == 0

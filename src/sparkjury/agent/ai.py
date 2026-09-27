@@ -55,6 +55,9 @@ NODE_ENDPOINTS: dict[str, ModelSpec] = {
 
 DEFAULT_MODEL = "subject"
 
+#: 能当 agent 大脑的短名。`embed` 不算：它只会算向量，拿它跑对话只会得到一堆错误。
+CHAT_ENDPOINTS: tuple[str, ...] = tuple(name for name in NODE_ENDPOINTS if name != "embed")
+
 
 def resolve_model(target: str | None = None) -> ModelSpec:
     """把 `judge-a` / `http://host:8000/v1#model-id` / 裸模型名统一成一个 ModelSpec。
