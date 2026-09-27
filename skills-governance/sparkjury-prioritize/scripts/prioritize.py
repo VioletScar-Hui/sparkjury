@@ -110,6 +110,8 @@ def main(argv=None) -> int:
     ap.add_argument("--overrides", type=Path, help="ledger JSONL，供 load_overrides 筛 override_priority")
     ap.add_argument("--total-badcases", type=int, default=None,
                     help="frequency_norm 分母；缺省自动读同目录 cluster_report.json 的 total_badcases")
+    ap.add_argument("--temperature", type=float, default=None,
+                    help="呈现层温度 0-1：低=只浮 P0 级重点修，高=全量细粒（None=关，行为不变）")
     ap.add_argument("--out-dir", type=Path, default=Path("out"))
     ap.add_argument("--run-id")
     ap.add_argument("--pack-hash", help="pack 内容 sha256；--pack 已给时缺省自动算")
@@ -135,7 +137,8 @@ def main(argv=None) -> int:
     try:
         return run(args.clusters, args.thresholds, args.out_dir, args.run_id,
                    args.pack_hash, args.ledger, args.overrides, args.total_badcases,
-                   args.pack, args.pack_id, args.pack_version)
+                   args.pack, args.pack_id, args.pack_version,
+                   temperature=args.temperature)
     except (YamlLiteError, ValueError, json.JSONDecodeError) as e:
         print(f"FATAL: 输入/pack 不可用，未做任何修补：{e}", file=sys.stderr)
         return 3

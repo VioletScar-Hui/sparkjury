@@ -327,6 +327,39 @@ def selftest() -> int:
         except ValueError:
             pass
 
+
+        # 9) 呈现层温度（万凌 2026-09-27 产品定义："用温度决定输出的浓度"）
+        from focus import apply_temperature
+        _rk = [
+            {"rank": 1, "category_id": "F08", "severity": 3, "frequency": 0.6, "priority": 0.3, "rationale": "r8"},
+            {"rank": 2, "category_id": "F01", "severity": 2, "frequency": 0.4, "priority": 0.24, "rationale": "r1"},
+        ]
+        _base = {"ranked": _rk, "top_recommendation": {"category_id": "F08"},
+                 "override_applied": [], "override_unmatched": []}
+        _same = apply_temperature(dict(_base), None)
+        if "temperature" in _same or len(_same["ranked"]) != 2:
+            failures.append("温度 None 时必须零变化")
+        _r = apply_temperature({**_base, "ranked": [dict(x) for x in _rk]}, 0.2)
+        if [x["category_id"] for x in _r["ranked"]] != ["F08"]:
+            failures.append("p0 档应只浮 severity=3")
+        if not (_r["temperature"]["suppressed"] and _r["temperature"]["suppressed"][0]["category_id"] == "F01"
+                and "severity" in _r["temperature"]["suppressed"][0]["reason"]):
+            failures.append("温度抑制必须逐条带 reason，不许静默消失")
+        _r = apply_temperature({**_base, "ranked": [dict(x) for x in _rk]}, 0.9)
+        if len(_r["ranked"]) != 2 or _r["temperature"]["suppressed"]:
+            failures.append("full 档应全部浮出")
+        _r = apply_temperature({**_base,
+                                "ranked": [dict(_rk[1], rank=1), dict(_rk[0], rank=2)],
+                                "top_recommendation": {"category_id": "F01"},
+                                "override_applied": [{"category_id": "F01"}]}, 0.2)
+        if not (_r["ranked"] and _r["ranked"][0]["category_id"] == "F01"
+                and _r["ranked"][0].get("pinned_by_override")):
+            failures.append("人工 override 必须钉住温度（p0 档也浮出）")
+        _r = apply_temperature({"ranked": [dict(_rk[1])], "top_recommendation": {"category_id": "F01"},
+                                "override_applied": [], "override_unmatched": []}, 0.1)
+        if _r["top_recommendation"] is not None or "不是无 badcase" not in _r["temperature"]["note"]:
+            failures.append("全抑制时 top 必须为 None 且 note 如实说明")
+
     if failures:
         print("[prioritize --selftest] FAIL")
         for f in failures:
@@ -334,7 +367,7 @@ def selftest() -> int:
         return 1
     print("[prioritize --selftest] PASS — 3 簇排序 F02>F04>F05，F99 拒排，"
           "override hook 生效（含 taxonomy_id 权威键 / cluster_id target mismatch 不静默 / "
-          "govern 投影字段透传），分母口径一致，pack 身份不写死")
+          "govern 投影字段透传），分母口径一致，pack 身份不写死，呈现层温度三档+override 钉住")
     return 0
 
 

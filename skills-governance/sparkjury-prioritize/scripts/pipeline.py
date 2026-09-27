@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from overrides import load_overrides  # noqa: E402
 from pack_binding import resolve_pack_binding  # noqa: E402
+from focus import apply_temperature
 from ranking import load_thresholds, rank  # noqa: E402
 
 SKILL_NAME = "prioritize"
@@ -79,7 +80,8 @@ def resolve_total_badcases(clusters_path: Path, clusters: list, explicit: int | 
 def run(clusters_path: Path, thresholds_path: Path, out_dir: Path, run_id: str,
         pack_hash: str | None, ledger: str | None, overrides_path: Path | None,
         total_badcases: int | None = None, pack_dir: Path | None = None,
-        pack_id: str | None = None, pack_version: str | None = None) -> int:
+        pack_id: str | None = None, pack_version: str | None = None,
+        temperature: float | None = None) -> int:
     thresholds = load_thresholds(thresholds_path)
     doc = json.loads(clusters_path.read_text(encoding="utf-8"))
     clusters = doc.get("clusters", doc) if isinstance(doc, dict) else doc
@@ -97,6 +99,8 @@ def run(clusters_path: Path, thresholds_path: Path, out_dir: Path, run_id: str,
                                "total_badcases": total, "total_source": total_src}}])
 
     result = rank(clusters, thresholds, overrides, total)
+    # 呈现层温度（万凌 2026-09-27 产品定义）：None=关，输出与旧版逐字节一致
+    result = apply_temperature(result, temperature)
 
     out = {
         "ranked": result["ranked"],
@@ -111,6 +115,7 @@ def run(clusters_path: Path, thresholds_path: Path, out_dir: Path, run_id: str,
             # 恒存在（无 override 时为 []）：空数组 = 没有未生效的人工决策，
             # 缺这个键则下游无法区分"没有"和"没记"。
             "override_unmatched": result["override_unmatched"],
+            **({"temperature": result["temperature"]} if "temperature" in result else {}),
             "disclaimer": (
                 "fixability_boost 为 pack v0.1 人工先验（未经黄金池校准）；"
                 "优先级只表达『先修哪一类』的相对顺序，不承诺修复成本与收益的绝对值。"

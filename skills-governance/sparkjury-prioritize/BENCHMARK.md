@@ -72,3 +72,18 @@ skill 版本: 0.1.0
 ```
 
 （尚无记录 —— 本 skill 首版，首次 benchmark 待跑。）
+
+## 呈现层温度（2026-09-27 新增，实测记录）
+
+```bash
+# 三档行为（fixture 两簇：F08 sev3/60% + F01 sev2/40%）
+python3 skills-governance/sparkjury-prioritize/scripts/run.py \
+  --clusters <clusters.json> --pack standards/scenario-pack --temperature 0.2 --out-dir /tmp/t
+# t=0.2(p0)：只浮 F08，F01 进 suppressed 带 reason ✅ 实测
+# t=0.6(standard)/0.9(full)：两簇全浮 ✅ 实测
+# 不传：输出无 temperature 键，与旧版逐字节一致 ✅ 实测
+# override(F01→rank1)+t=0.2：F01 钉住浮出（pinned_by_override）✅ 实测
+# 真实节点卡（loop 全 sev2）+t=0.2：浮出 0 + note 如实（"不是无 badcase"）✅ 实测
+```
+通过标准：selftest 第 9 组 6 条断言全绿；抑制清单永不为静默丢弃。
+
