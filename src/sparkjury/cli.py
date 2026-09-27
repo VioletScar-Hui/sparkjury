@@ -388,6 +388,8 @@ def regress(
     out: Path | None = typer.Option(None, "--out", help="write the markdown report here"),
     pairwise: str | None = typer.Option(None, "--pairwise", help="'mock' or a panel TOML; judges before/after pairs with order swap"),
     as_json: bool = typer.Option(False, "--json"),
+    gates: bool = typer.Option(True, "--gates/--no-gates", help="回归门禁：同 pack 铁律 + Δpass^k 阈值 + 新高严重簇阻断"),
+    delta_min: float = typer.Option(0.02, "--delta-min", help="主指标最小提升（治理来源：pack thresholds.regress）"),
 ) -> None:
     """Compare two evaluation stores (M6): pass^k before/after, tasks fixed or broken, cluster shifts."""
     from sparkjury.regress import compare, render_markdown
@@ -406,13 +408,43 @@ def regress(
         spec = PanelConfig.from_toml(pairwise).judges[0]
         judge = OpenAIPairwiseJudge(spec.name, spec.model, spec.base_url or "", os.environ.get(spec.api_key_env) if spec.api_key_env else None, timeout_s=spec.timeout_s)
     r = compare(before, after, pairwise=judge, before_label=before.name, after_label=after.name)
-    if as_json:
-        console.print_json(r.model_dump_json())
-        return
+    gate_result = None
+    if gates:
+        from sparkjury.regress.passk import compute_gates
+        from sparkjury.store.sqlite import TraceStore as _TS
+
+        def _manifest_of(db: Path):
+            mp = db.resolve().parent / "manifest.json"
+            try:
+                return json.loads(mp.read_text(encoding="utf-8")) if mp.exists() else None
+            except (json.JSONDecodeError, OSError):
+                return None
+        with _TS(after) as _s:
+            _crun = _s.get_cluster_run()
+        sev = {c.label.value: c.severity for c in (_crun.clusters if _crun else [])}
+        gate_result = compute_gates(_manifest_of(before), _manifest_of(after), r,
+                                    delta_min=delta_min, after_severities=sev)
     md = render_markdown(r)
+    if gate_result:
+        md += "\n\n## Gates: " + gate_result["verdict"] + "\n" + "\n".join(
+            f"- [{c['status']}] {c['gate']}: {c['detail']}" for c in gate_result["checks"]) + "\n"
+    if as_json:
+        payload = json.loads(r.model_dump_json())
+        payload["verdict"] = r.verdict          # property 不进 model_dump，旧疣顺手修
+        if gate_result:
+            payload["gates"] = gate_result
+        console.print_json(json.dumps(payload, ensure_ascii=False))
+        if out:                                  # 旧疣：--json 曾静默跳过 --out
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(md, encoding="utf-8")
+        return
     console.print(f"[green]regression[/] {r.verdict}: pass^{r.k} {_pct(r.pass_k_before)} -> {_pct(r.pass_k_after)} "
                   f"({'-' if r.delta_pass_k is None else f'{r.delta_pass_k * 100:+.1f} pp'}); "
                   f"fixed {len(r.fixed_tasks)}, broken {len(r.broken_tasks)}; badcases {r.n_badcases_before} -> {r.n_badcases_after}")
+    if gate_result:
+        color = "green" if gate_result["verdict"] == "PASS" else "red"
+        console.print(f"[{color}]gates {gate_result['verdict']}[/]: " + "; ".join(
+            f"{c['gate']}={c['status']}" for c in gate_result["checks"]))
     if r.pairwise_summary:
         console.print("  pairwise: " + ", ".join(f"{k}={v}" for k, v in sorted(r.pairwise_summary.items())))
     if out:

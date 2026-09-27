@@ -37,7 +37,7 @@ def build_card(store: TraceStore, run_id: str = "latest", title: str | None = No
         n_unclustered=crun.n_noise if crun else 0,
     )
     quality = CardQuality(
-        pass_rate=st.pass_rate, pass_k=st.pass_k,
+        pass_rate=st.pass_rate, pass_k=st.pass_k, pass_k_comb=st.pass_k_comb, pass_at_k=st.pass_at_k,
         agent_model=max(st.agent_models, key=st.agent_models.get) if st.agent_models else None,
         judge_agreement_rate=vs["agreement_rate"], n_needing_arbitration=vs["n_needing_arbitration"],
         decisions_by_source=ar["by_source"], n_degraded=ar["n_degraded"],

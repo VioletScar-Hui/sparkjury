@@ -40,8 +40,19 @@ class Orchestrator:
         self.run_dir = config.run_dir
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.bus = bus or EventBus(config.run_id, self.run_dir / "events.jsonl")
+        # 评测标准指纹（接口①前置）：standards/scenario-pack 在则把 frozen_hash 戳进
+        # manifest——回归对比"标准没变过"从口头承诺变成两份 manifest 的字段比对。
+        pack_fp = None
+        _pm = Path("standards/scenario-pack/pack.manifest.json")
+        if _pm.exists():
+            try:
+                _pj = json.loads(_pm.read_text(encoding="utf-8"))
+                pack_fp = {"pack_id": _pj.get("pack_id"), "version": _pj.get("version"),
+                           "state": _pj.get("state"), "frozen_hash": _pj.get("frozen_hash")}
+            except (json.JSONDecodeError, OSError):
+                pack_fp = {"error": "pack.manifest.json unreadable"}
         self.manifest: dict[str, Any] = {
-            "run_id": config.run_id, "status": "running", "sparkjury_version": __version__,
+            "run_id": config.run_id, "status": "running", "sparkjury_version": __version__, "pack": pack_fp,
             "python": platform.python_version(), "host": platform.node(),
             "config": json.loads(config.model_dump_json()), "stages": {}, "degradations": [], "models": {},
         }
@@ -277,6 +288,7 @@ class Orchestrator:
                          n_noise=sum(x.size for x in clusters if x.cluster_id == -1), embedder=emb_name, method=used,
                          clusters=clusters, badcases=badcases)
         self._store.put_cluster_run(run)
+        (self.run_dir / "clusters.json").write_text(run.model_dump_json(indent=2), encoding="utf-8")  # 接口②：产物落文件，下游 skill 有文件契约可吃
         self.manifest["models"]["embedder"] = emb_name
         return {"n_badcases": run.n_badcases, "n_clusters": run.n_clusters, "n_noise": run.n_noise, "method": used,
                 "label_sources": label_counts,

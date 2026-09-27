@@ -177,3 +177,37 @@ def test_cli_report_and_regress(before_db, after_db, tmp_path):
     r = runner.invoke(app, ["regress", "--before", str(before_db), "--after", str(after_db), "--json"])
     assert r.exit_code == 0, r.output
     assert json.loads(r.stdout)["fixed_tasks"][0]["task_id"] == "retail_task_004"
+
+
+def test_regress_gates_three_checks():
+    """接口①：回归三判据是纯函数，直接喂 manifest/report 断言。
+
+    铁律语义：pack hash 不同 = 新一轮评测不是回归 → FAIL；任一侧缺指纹（老 run）→
+    UNKNOWN 不阻断但如实标注；Δpass 低于阈值 → FAIL；after 独有高严重簇 → FAIL。
+    """
+    from sparkjury.models.regress import ClusterChange, RegressionReport
+    from sparkjury.regress.passk import compute_gates
+
+    def _rep(**kw):
+        return RegressionReport(before_label="b", after_label="a", n_tasks_common=6, k=3, **kw)
+
+    rep = _rep(delta_pass_k=0.05,
+               cluster_changes=[ClusterChange(label="loop", before=3, after=1, delta=-2)])
+    m = lambda h: {"pack": {"frozen_hash": h}}
+
+    g = compute_gates(m("a" * 64), m("a" * 64), rep)
+    assert g["verdict"] == "PASS" and all(c["status"] == "PASS" for c in g["checks"])
+
+    g = compute_gates(m("a" * 64), m("b" * 64), rep)
+    assert g["verdict"] == "FAIL"
+    assert next(c for c in g["checks"] if c["gate"] == "same_pack_hash")["status"] == "FAIL"
+
+    g = compute_gates(None, m("a" * 64), rep)
+    assert next(c for c in g["checks"] if c["gate"] == "same_pack_hash")["status"] == "UNKNOWN"
+
+    rep2 = _rep(delta_pass_k=0.001,
+                cluster_changes=[ClusterChange(label="policy_violation", before=0, after=2, delta=2)])
+    g = compute_gates(m("a" * 64), m("a" * 64), rep2, after_severities={"policy_violation": 4.2})
+    assert g["verdict"] == "FAIL"
+    by = {c["gate"]: c["status"] for c in g["checks"]}
+    assert by["primary_delta"] == "FAIL" and by["no_new_severe_cluster"] == "FAIL"

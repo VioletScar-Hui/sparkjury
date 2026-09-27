@@ -40,6 +40,13 @@ class Confirm(BaseModel):
     decided_by: str = "pm"
 
 
+class Reject(BaseModel):
+    """本轮不修。必须模块级：`from __future__ import annotations` 让注解变字符串，
+    闭包内定义的模型 FastAPI 解析不到，body 会被误判成 query 参数（422）。"""
+    note: str = ""
+    decided_by: str = "pm"
+
+
 def create_app(runs_dir: str | Path = "runs", *, dgx_endpoints: list[dict[str, str]] | None = None, probe_endpoints: bool = True,
                token: str | None = None, config_root: str | Path | None = None) -> FastAPI:
     """`token` (or env SPARKJURY_API_TOKEN) protects every route except /health: pass it as
@@ -286,7 +293,42 @@ def create_app(runs_dir: str | Path = "runs", *, dgx_endpoints: list[dict[str, s
                "next": f"apply the fix, re-run the same tasks, then: sparkjury regress --before {m.get('config', {}).get('db')} --after <new db>"}
         p = mgr.run_dir(run_id) / "confirm.json"
         p.write_text(json.dumps(rec, ensure_ascii=False, indent=2), encoding="utf-8")
+        # 接口③：拍板进决策账本（黄金池入口）。rank 1 = 接受系统建议（accept_card）；
+        # 点了非 top 的簇 = 人工改序（override_priority，带齐 card-spec §8.1 四字段）。
+        from sparkjury.api.decisions import append_decision
+        top = next((c for c in run.clusters if c.rank == 1), None) if run else None
+        if cl.rank == 1:
+            rec["decision_event"] = append_decision(
+                run_id, "accept_card", body.decided_by, f"cluster:{cl.cluster_id}",
+                {"taxonomy_id": cl.label.value, "rationale": body.note,
+                 "system_top": cl.label.value, "human_top": cl.label.value})
+        else:
+            rec["decision_event"] = append_decision(
+                run_id, "override_priority", body.decided_by, f"cluster:{cl.cluster_id}",
+                {"taxonomy_id": cl.label.value, "to_rank": 1,
+                 "system_top": top.label.value if top else None,
+                 "human_top": cl.label.value, "rationale": body.note})
         return rec
+
+    @app.post("/runs/{run_id}/reject")
+    def reject(run_id: str, body: Reject) -> dict[str, Any]:
+        """本轮不修（reject_proposal）——不可逆的人类决策，同样必须进账本。"""
+        _manifest_or_404(run_id)
+        from sparkjury.api.decisions import append_decision
+        with _store(run_id) as store:
+            run = store.get_cluster_run()
+        top = next((c for c in run.clusters if c.rank == 1), None) if run else None
+        ev = append_decision(run_id, "reject_proposal", body.decided_by,
+                             f"card:{run_id}",
+                             {"taxonomy_id": top.label.value if top else None,
+                              "rationale": body.note or "本轮不修"})
+        return {"run_id": run_id, "decision_event": ev}
+
+    @app.get("/runs/{run_id}/decisions")
+    def decisions(run_id: str) -> list[dict[str, Any]]:
+        _manifest_or_404(run_id)
+        from sparkjury.api.decisions import list_decisions
+        return list_decisions(run_id)
 
     @app.get("/runs/{run_id}/confirm")
     def get_confirm(run_id: str) -> dict[str, Any] | None:
