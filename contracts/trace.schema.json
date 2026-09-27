@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eval-agent.local/contracts/trace.schema.json",
+  "title": "Trace",
+  "description": "评测 agent 统一轨迹契约。所有 skill 只认这一种格式；ingest 负责把 OTel GenAI / tau2-bench / 企业私有格式归一化到本 schema。隐私设计：正文内容只进 *_hash + *_summary 字段，不落原文，PII 由 clean 在 ingest 后兜底。",
+  "type": "object",
+  "required": ["format_version", "trace_id", "task", "agent", "spans", "status"],
+  "properties": {
+    "format_version": { "const": "trace.v1" },
+    "trace_id": { "type": "string", "description": "全局唯一，run 内稳定" },
+    "run_id": { "type": "string", "description": "产生这条 trace 的被评 agent 运行批次 id" },
+    "task": {
+      "type": "object",
+      "required": ["task_id", "instruction"],
+      "properties": {
+        "task_id": { "type": "string" },
+        "instruction": { "type": "string", "description": "给被评 agent 的用户指令原文" },
+        "domain": { "type": "string", "description": "如 retail / marketing" },
+        "available_tools": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "expected_outcome_ref": {
+          "type": "string",
+          "description": "终态 checker 引用（scenario-pack/checkers/ 下的 checker id）；缺省表示该任务无金标，只能评过程维"
+        },
+        "golden_steps_ref": {
+          "type": "string",
+          "description": "可选：golden trajectory 引用，用于过程维金标比对"
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "required": ["name", "model"],
+      "properties": {
+        "name": { "type": "string" },
+        "model": { "type": "string", "description": "被评 agent 底座模型。红线：不得与任一裁判同族" },
+        "framework": { "type": "string", "description": "如 tau2 / langgraph / custom" },
+        "version": { "type": "string" }
+      }
+    },
+    "spans": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/span" }
+    },
+    "status": {
+      "enum": ["success", "failure", "partial", "aborted", "unknown"]
+    },
+    "outcome": {
+      "description": "可选：运行方自带的终态观测（如 tau2 的 DB 终态 diff），供 checker 复核",
+      "anyOf": [
+        { "type": "null" },
+        { "type": "object" }
+      ]
+    },
+    "env_facts": {
+      "type": "object",
+      "description": "precheck 判环境因假 badcase 的输入，由 harness 提供",
+      "properties": {
+        "tool_available": { "type": "boolean" },
+        "permissions_granted": { "type": "boolean" },
+        "network_ok": { "type": "boolean" },
+        "timeout_triggered": { "type": "boolean" }
+      }
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "ended_at": { "type": "string", "format": "date-time" },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "source_format": { "enum": ["otel_json", "tau2_jsonl", "custom_json", "unknown"] },
+        "source_file": { "type": "string" },
+        "ingested_by": { "type": "string", "description": "ingest skill 版本" }
+      }
+    }
+  },
+  "$defs": {
+    "span": {
+      "type": "object",
+      "required": ["span_id", "type", "name"],
+      "properties": {
+        "span_id": { "type": "string" },
+        "parent_id": { "type": ["string", "null"] },
+        "type": {
+          "enum": ["invoke_agent", "chat", "execute_tool", "other"],
+          "description": "对齐 OTel GenAI 语义约定的三层"
+        },
+        "name": { "type": "string" },
+        "start_ms": { "type": "number" },
+        "end_ms": { "type": "number" },
+        "chat": {
+          "type": "object",
+          "properties": {
+            "model": { "type": "string" },
+            "prompt_hash": { "type": "string" },
+            "completion_hash": { "type": "string" },
+            "tokens_in": { "type": "integer" },
+            "tokens_out": { "type": "integer" }
+          }
+        },
+        "tool": {
+          "type": "object",
+          "properties": {
+            "tool_name": { "type": "string" },
+            "arguments_hash": { "type": "string" },
+            "status": { "enum": ["ok", "error", "timeout", "permission_denied", "not_found"] },
+            "error_code": { "type": ["string", "null"] },
+            "result_hash": { "type": "string" },
+            "result_summary": { "type": "string", "description": "截断后的结果摘要，供 LLM judge 阅读" }
+          }
+        }
+      }
+    }
+  }
+}

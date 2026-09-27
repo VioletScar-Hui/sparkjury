@@ -41,4 +41,5 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate_skills.py skills | tail -1
 echo "===[6/7] pack_freeze --verify（标准内容寻址）==="
 PYTHONDONTWRITEBYTECODE=1 python3 tools/pack_freeze.py --verify
 
+echo "===[7/7] 全部门禁通过==="
 echo "ALL GATES PASSED"

@@ -3,7 +3,7 @@
 > 本文件的命令在 sparkjury 仓根目录、macOS (darwin 25.5.0)、Python 3.12、uv 环境下**逐条实跑通过**。
 > 阈值口径引用 `standards/scenario-pack/thresholds.yaml` 的 `arbitration` 段
 > 与 `standards/scenario-pack/judges.yaml` 的 `arbiter` 段（FROZEN pack，
-> `frozen_hash = 3d736734`）。
+> `frozen_hash = 6ecbd667`）。
 
 ## 0. 环境前提交代（macOS 必做，本坑实测踩中）
 

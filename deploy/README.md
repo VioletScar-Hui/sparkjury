@@ -80,5 +80,7 @@ nat eval --config_file nat/configs/sparkjury_eval.yml --skip_workflow --dataset 
 | vLLM OOM at start, or the whole tmux session vanishes | the kernel OOM killer took the user session down (seen 9-26 with bf16 Qwen3-30B next to Nemotron). Use the FP8 judge_a, keep the `*_MEM` sum <= 0.75, start servers one at a time, `loginctl enable-linger` |
 | judge answers but `sparkjury score` reports errors | `curl 127.0.0.1:8001/v1/models`; check `logs/judge_a.log`; try `extra_body = { chat_template_kwargs = { enable_thinking = false } }` in `deploy/judges.toml` |
 | cockpit 401 | add `?token=<SPARKJURY_API_TOKEN>` to the URL once; it is remembered in the browser |
+| `start_judges.sh` exits with `SPARKJURY_API_TOKEN 是空的`, or `serve` says `refusing to serve on 0.0.0.0` | the public API must have auth. Put `SPARKJURY_API_TOKEN` in `deploy/dgx/.env` (start_judges.sh fails *before* it creates the tmux session or touches vLLM, so nothing is half-started). For a local-only cockpit use `--host 127.0.0.1`, or start judges alone with `--no-api` |
+| API answers 403 `refusing unauthenticated access from a non-loopback client` | the service is running without a token, so it only accepts loopback clients. Set the token and restart, or reach it through `ssh -L` |
 | SSH drops kill jobs | everything runs inside tmux; `tmux attach -t sparkjury` |
 | `No space left on device` | `df -h`, clear `~/.cache/huggingface`, old `runs/` |

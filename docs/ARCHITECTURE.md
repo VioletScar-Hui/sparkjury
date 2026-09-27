@@ -224,10 +224,10 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 | M4 | 仲裁与审计 | P0 | 已完成，10 个用例 |
 | M5 | badcase 聚类与优先级 | P0 | 已完成，9 个用例 |
 | M6 | 证据卡片 + 回归对比 | P0 | 已完成，8 个用例 |
-| M7 | Harness 编排器 | P0 | 已完成，8 个用例 |
-| M8 | API + Agent Cockpit | 后端 P0 / 前端 P1 | 后端与兜底页已完成，5 个用例 |
+| M7 | Harness 编排器 | P0 | 已完成，9 个用例 |
+| M8 | API + Agent Cockpit | 后端 P0 / 前端 P1 | 后端与兜底页已完成，11 个用例 |
 | M9 | Agent Skills 打包 + NeMo Agent Toolkit | P1 | 已完成，21 个用例（3 个跳过）|
-| M10 | DGX 部署 + τ²-bench 跑数 + 演示数据 | P0 | 脚本与 token 已完成，16 个用例；节点上执行待做 |
+| M10 | DGX 部署 + τ²-bench 跑数 + 演示数据 | P0 | 脚本与 token 已完成，18 个用例；节点上执行待做 |
 | M11 | README / 征文 / 视频脚本 | P0 | 初稿已完成，2 个用例；截图、真实数字、录制待补 |
 | M12 | 跨平台与仓库约定守卫 | P1 | 已完成，17 个用例 |
 
@@ -342,6 +342,8 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 
 这张表由 `scripts/certificate.py` 与 `src/sparkjury/api/app.py` 里注册的路由逐条比对，多写少写都会红。
 
+请求里的路径一律先归位再用，越界报 400：`run_id` 只能是单层目录名（`RunManager.run_dir()` 是所有读写的公共出口），`db` 必须落在 `runs_dir` 之内（否则 `reset_db` 的 `unlink()` 会作用到宿主机上任意一个文件），`config_path` 必须落在服务进程工作目录之内。没配 token 时只服务回环来的请求；`sparkjury serve` 绑公网又不给 token 会直接拒绝启动，`deploy/dgx/start_judges.sh` 在起 tmux 之前就把这种情况拦掉。
+
 Cockpit 三栏：左 USER TASK（本轮配置），中 AGENT TIMELINE（状态机进度与每条 trace 流水），右 DGX SPARK（模型显存、GPU 利用率、本地与云端调用计数）。底部 FINAL ARTIFACT 是证据卡片。
 
 ### M9 Agent Skills 打包 + NeMo Agent Toolkit
@@ -438,7 +440,7 @@ Cockpit 三栏：左 USER TASK（本轮配置），中 AGENT TIMELINE（状态�
 
 ## 16. 当前进度与验证方法
 
-M1 到 M12 已完成（M10 节点执行、M11 录制待做），127 个 pytest 用例通过。一条命令跑通全流程：
+M1 到 M12 已完成（M10 节点执行、M11 录制待做），136 个 pytest 用例通过。一条命令跑通全流程：
 
 ```
 cd sparkjury

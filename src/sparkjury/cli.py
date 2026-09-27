@@ -514,9 +514,13 @@ def serve(
     port: int = typer.Option(9000, "--port", help="on the DGX node use 9000 (mapped to public 9030)"),
     runs_dir: Path = typer.Option(Path("runs"), "--runs-dir"),
     no_probe: bool = typer.Option(False, "--no-probe", help="skip probing model endpoints in /dgx"),
-    token: str | None = typer.Option(None, "--token", help="API token (default: env SPARKJURY_API_TOKEN); required when binding a public interface"),
+    token: str | None = typer.Option(None, "--token", help="API token (default: env SPARKJURY_API_TOKEN); required when binding a public interface, otherwise serve refuses to start"),
 ) -> None:
-    """Start the API + Cockpit (M8). Open http://<host>:<port>/ in a browser."""
+    """Start the API + Cockpit (M8). Open http://<host>:<port>/ in a browser.
+
+    绑公网（非回环）地址时必须给 token，否则这里直接拒绝启动：日志里滚过去的一句警告拦不住任何人，
+    而「8888 和 9000 上对外提供的服务必须有鉴权」是节点手册的红线。本机自用 `--host 127.0.0.1` 不需要 token。
+    """
     import os
 
     import uvicorn
@@ -524,8 +528,12 @@ def serve(
     from sparkjury.api import create_app
 
     tok = token if token is not None else os.environ.get("SPARKJURY_API_TOKEN") or None
-    if host not in ("127.0.0.1", "localhost") and not tok:
-        console.print("[yellow]warning:[/] binding a non-local interface without a token; set SPARKJURY_API_TOKEN or --token")
+    if host not in ("127.0.0.1", "localhost", "::1") and not tok:
+        err_console.print(
+            f"[red]refusing to serve on {host} without a token[/]：8888/9000 上对外提供的服务必须有鉴权（节点手册红线）。"
+            "设 SPARKJURY_API_TOKEN（节点上是 deploy/dgx/.env 里那一项）或加 --token；只想本机用就 --host 127.0.0.1。"
+        )
+        raise typer.Exit(code=2)
     console.print(f"[green]SparkJury cockpit[/] http://{host}:{port}/" + ("?token=<token>" if tok else "") + f"   runs dir: {runs_dir}   auth: {'on' if tok else 'off'}")
     # access_log off: request lines would otherwise print ?token= query strings into the log
     uvicorn.run(create_app(runs_dir, probe_endpoints=not no_probe, token=tok), host=host, port=port, log_level="info", access_log=False)

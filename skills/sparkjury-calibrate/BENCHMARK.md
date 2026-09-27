@@ -20,9 +20,8 @@ python3 skills/sparkjury-calibrate/scripts/compute_profile.py \
   --votes   runs/<run_id>/calibration_votes.json \
   --gold    runs/<run_id>/calibration_golds.json \
   --calibration-set runs/<run_id>/evalset.json#sets.calibration \
-  --thresholds    standards/scenario-pack/pack_view/thresholds.json \
+  --thresholds    standards/scenario-pack/thresholds.yaml \
   --judged-agent  runs/<run_id>/agent.json \
-  --judges-panel  pack_view/judges.json \
   --pack    standards/scenario-pack \
   --output  runs/<run_id>/judge_profile.json \
   --ledger  runs/<run_id>/ledger.jsonl

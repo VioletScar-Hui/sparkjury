@@ -1,11 +1,13 @@
 import json
 import time
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from sparkjury.api import create_app
 from sparkjury.api import dgx as dgx_mod
+from sparkjury.api.runs import InvalidRunId, RunManager, resolve_within
 
 
 @pytest.fixture
@@ -123,3 +125,98 @@ def test_dgx_sample_handles_unified_memory_na(monkeypatch):
     g = dgx_mod.sample_gpus()
     assert g["available"] and g["gpus"][0]["unified_memory"] and g["gpus"][0]["mem_total_mb"] == 121000.0
     assert g["gpus"][0]["util_pct"] == 3.0 and g["gpus"][0]["temp_c"] is None
+
+
+# ---- 请求里的路径不能决定宿主机上删/写哪个文件 ------------------------------------------------
+#
+# 这些用例都是先对着旧代码跑红过的。注意 URL 里的 run_id 一直没被打穿过：Starlette 的 {run_id}
+# 默认只匹配 [^/]+，斜杠进不来。真正能带路径的是请求体里的 run_id / db，那条路没有任何中间件拦。
+
+BAD_RUN_IDS = ["../escape", "..", "a/b", "a\\b", "/etc/passwd", ".hidden", "x" * 200]
+
+
+def test_start_run_rejects_run_id_that_escapes_runs_dir(client, tmp_path):
+    """run_id 会被拼成 runs_dir/<run_id>/manifest.json，以前原样接受。"""
+    for bad in BAD_RUN_IDS:
+        r = client.post("/runs", json={"demo": True, "run_id": bad})
+        assert r.status_code == 400, f"run_id={bad!r} 应为 400，实际 {r.status_code}"
+    assert not (tmp_path / "escape").exists()
+    assert not (tmp_path.parent / "escape").exists()
+
+
+def test_start_run_rejects_db_outside_runs_dir(client, tmp_path):
+    """db 以前原样进 RunConfig，而 reset_db 会在开跑前 unlink 它 —— 一个请求删掉任意文件。"""
+    victim = tmp_path / "victim.db"
+    victim.write_text("precious", encoding="utf-8")
+    assert client.post("/runs", json={"demo": True, "db": str(victim)}).status_code == 400
+    assert victim.read_text(encoding="utf-8") == "precious"
+    # 用 .. 绕回来的写法一样拒
+    r = client.post("/runs", json={"demo": True, "db": str(tmp_path / "runs" / ".." / "victim.db")})
+    assert r.status_code == 400 and "db 必须位于" in r.text
+    assert victim.read_text(encoding="utf-8") == "precious"
+
+
+def test_manifest_reads_reject_illegal_run_id(tmp_path):
+    """run_dir() 是所有读写的公共出口，校验放在那儿，读和写就都出不去 runs_dir。"""
+    mgr = RunManager(tmp_path / "runs")
+    assert mgr.run_dir("ok-1.2_3") == (tmp_path / "runs" / "ok-1.2_3").resolve()
+    for bad in BAD_RUN_IDS + [""]:
+        with pytest.raises(InvalidRunId):
+            mgr.run_dir(bad)
+        with pytest.raises(InvalidRunId):  # manifest 走 run_dir，读盘前就得拦住
+            mgr.manifest(bad)
+        with pytest.raises(InvalidRunId):
+            mgr.events(bad)
+        with pytest.raises(InvalidRunId):
+            mgr.db_path(bad)
+
+
+def test_resolve_within_keeps_paths_inside_the_root(tmp_path):
+    root = tmp_path / "runs"
+    (root / "sub").mkdir(parents=True)
+    assert resolve_within(root, root / "sub" / "x.db", "db") == (root / "sub" / "x.db").resolve()
+    for bad in [tmp_path / "out.db", root / ".." / "out.db", Path("/etc/hosts"), root / "sub" / ".." / ".." / "out.db"]:
+        with pytest.raises(ValueError):
+            resolve_within(root, bad, "db")
+    link = root / "link"
+    try:
+        link.symlink_to(tmp_path, target_is_directory=True)
+    except OSError:
+        return  # Windows 建 symlink 要权限，建不了就只验上面那几条
+    with pytest.raises(ValueError):  # symlink 也要展开后再比，不能只看字符串前缀
+        resolve_within(root, link / "out.db", "db")
+
+
+def test_config_path_must_live_under_the_config_root(tmp_path, monkeypatch):
+    """config_path 以前只查"存在吗"，等于把「读宿主机任意路径」做成了一等公民。"""
+    monkeypatch.delenv("SPARKJURY_API_TOKEN", raising=False)
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "cfgroot"
+    root.mkdir()
+    (root / "ok.toml").write_text('run_id = "from-cfg"\n', encoding="utf-8")
+    outside = tmp_path / "outside.toml"
+    outside.write_text('run_id = "outside"\n', encoding="utf-8")  # 内容完全合法，位置不合法
+    with TestClient(create_app(tmp_path / "runs", probe_endpoints=False, config_root=root)) as c:
+        r = c.post("/runs", json={"config_path": str(outside)})
+        assert r.status_code == 400 and "config_path 必须位于" in r.text
+        assert c.post("/runs", json={"config_path": str(root)}).status_code == 400  # 目录不算文件
+        assert c.post("/runs", json={"config_path": "missing.toml"}).status_code == 400
+        # 范围内的真文件照旧
+        assert c.post("/runs", json={"config_path": str(root / "ok.toml"), "stages": ["BOGUS"]}).status_code == 400
+
+
+def test_app_without_token_refuses_non_loopback_clients(tmp_path, monkeypatch):
+    """没 token 时旧姿势是把服务敞开；现在非回环来源一律 403（红线：对外必须有鉴权）。"""
+    monkeypatch.delenv("SPARKJURY_API_TOKEN", raising=False)
+    open_app = create_app(tmp_path / "runs", probe_endpoints=False)
+    with TestClient(open_app, client=("203.0.113.7", 51234)) as c:
+        assert c.get("/runs").status_code == 403
+        assert c.get("/").status_code == 403
+        assert c.get("/health").status_code == 200  # 健康检查仍然公开，探活要用
+    for local in ("127.0.0.1", "::1"):
+        with TestClient(open_app, client=(local, 51234)) as c:
+            assert c.get("/runs").status_code == 200, local
+    # 配了 token 就是 401/放行那条路，不再是 403
+    with TestClient(create_app(tmp_path / "runs", probe_endpoints=False, token="t"), client=("203.0.113.7", 51234)) as c:
+        assert c.get("/runs").status_code == 401
+        assert c.get("/runs?token=t").status_code == 200

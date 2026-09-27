@@ -9,7 +9,7 @@ pack 是 FROZEN 态；要改阈值走 `govern` 的 DRAFT→FROZEN 状态机，�
 # 1. 结构与脚本门（必须）
 python3 -m json.tool skills/sparkjury-prioritize/schemas/io.schema.json > /dev/null
 python3 -m json.tool skills/sparkjury-prioritize/evals/evals.json > /dev/null
-PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile skills/sparkjury-prioritize/scripts/*.py
+python3 -m py_compile skills/sparkjury-prioritize/scripts/*.py && find skills/sparkjury-prioritize -name __pycache__ -exec rm -rf {} +  # py_compile 无视 PYTHONDONTWRITEBYTECODE，必须显式清，否则下一条 lint 的 pyc 门禁必红
 python3 skills/sparkjury-prioritize/scripts/run.py --selftest       # sparkjury 规范薄包装
 python3 skills/sparkjury-prioritize/scripts/prioritize.py --selftest
 
@@ -35,7 +35,7 @@ python3 skills/sparkjury-prioritize/scripts/prioritize.py \
 | 指标 | 通过标准 | 来源 |
 |---|---|---|
 | `--selftest` 七组断言 | 全 PASS，退出码 0 | 本 skill `scripts/_selftest.py` |
-| lint 结构门 | `[PASS] prioritize`，无 FAIL 项 | `scripts/lint_skills.py` |
+| lint 结构门 | `[PASS] sparkjury-prioritize`，无 FAIL 项 | `tools/lint_skills.py` |
 | evals 三条用例 | `expected_behavior` 全命中 | `evals/evals.json` |
 | JSON 合法性 | `json.tool` 对 schemas/evals 零错误 | `python3 -m json.tool` |
 | 公式正确性 | `priority == frequency_norm × severity_weight × fixability_boost`，逐位相符 | pack `prioritize.formula` |

@@ -2,6 +2,8 @@
 
 每个模块完成后在这里记一条：做了什么、怎么自测、怎么人工验证、验收人。
 
+各节里的「自测结果」是**当时那次运行**的记录（每节都带日期）。模块交付后测试还在往上加，所以那几个数字不是当前值；当前用例数以 `docs/ARCHITECTURE.md` 的模块表为准，那张表由 `scripts/certificate.py` 逐行核对。
+
 ---
 
 ## M1 数据契约 + 输入适配 + 存储（2026-09-26）
@@ -263,7 +265,8 @@ uv run sparkjury events demo-1 --kind degraded
 - `api/dgx.py`：DGX 资源面板的数据采集。
 - `api/static/index.html`：自包含的 Cockpit 兜底页，按备赛指南的三栏布局：左 USER TASK（本轮配置、模型、计数），中 AGENT TIMELINE（七个阶段的状态灯加实时事件流），右 DGX SPARK（GPU 显存条、模型端点红绿灯、本地与云端裁决计数）；底部 FINAL ARTIFACT 是证据卡片，每簇有"PM: fix this first"按钮。顶部可以直接点 Run demo。纯 HTML 加原生 JS，不依赖外网。
 - `cli.py`：`sparkjury serve [--host 0.0.0.0] [--port 9000] [--runs-dir runs] [--no-probe]`。DGX 节点上用 9000 端口，对应公网 9030。
-- `tests/test_m8_api.py`：4 个用例：通过 API 启动 demo 运行并读遍全部端点（SSE 回放、卡片、簇、记录、确认、自比回归）；第二次运行加评测集上限并做跨运行回归；错误路径；DGX 探测对不可达端点和缺 nvidia-smi 的处理。
+- 路径与鉴权：`run_id` 只接受单层目录名（`RunManager.run_dir()` 是所有读写的公共出口），`db` 必须落在 `runs_dir` 之内，`config_path` 必须落在服务进程工作目录之内，越界一律 400；没配 token 时中间件只放行回环来源。机制与锚点见 `docs/ARCHITECTURE.md` 的 M8 一节。
+- `tests/test_m8_api.py`：11 个用例：通过 API 启动 demo 运行并读遍全部端点（SSE 回放、卡片、簇、记录、确认、自比回归）；第二次运行加评测集上限并做跨运行回归；错误路径；DGX 探测对不可达端点和缺 nvidia-smi 的处理；以及请求里的路径出不了 `runs_dir`（非法 `run_id`、越界 `db`、越界 `config_path` 一律 400，`resolve_within` 连 symlink 一起展开后再比）、没 token 时非回环来源 403。
 
 **自测结果**：`uv run pytest` 69 passed（M1 到 M7 共 65 + M8 4）。另外实际起了服务做了冒烟：/health、首页、启动 demo、SSE 回放都正常。
 
@@ -339,8 +342,9 @@ cat skills/sparkjury-score/SKILL.md   # Windows PowerShell: type skills\sparkjur
   - `run_tau2.sh`：跑 τ²-bench retail，被评 Agent 走本地 8004 端口，模拟用户走 judge_a 的模型（与被评 Agent 权重不同），3 trial，结果落 data/simulations/ 并自动导入。
   - `make_demo_bundle.sh`：把一次运行的 db、清单、事件流、卡片打成 tar.gz，笔记本上解压后 `sparkjury serve` 就能离线回放，决赛不依赖节点在线。
 - `deploy/README.md`：节点上的六步操作手册和排障表，含 SSH 端口转发、tmux、9000 到 9030 的映射、token 用法。
-- API 访问令牌：`SPARKJURY_API_TOKEN` 或 `serve --token`。设了之后除 /health 外所有路由都要 `Authorization: Bearer` 或 `?token=`；Cockpit 页第一次带 ?token= 打开后记在浏览器里，之后自动附带。绑非本地地址又没设 token 会打印警告。这是节点手册"公网端口必须加访问控制"的要求。
-- `tests/test_m10_deploy.py`：13 个用例：token 拒绝与放行、环境变量来源、默认关闭、页面转发 token；脚本齐全且 bash -n 通过；env.example 覆盖脚本用到的全部变量；三处配置里端口一致、vLLM 只绑回环、显存比例之和留有余量；tau2 脚本的 Agent 与模拟用户用不同模型。
+- API 访问令牌：`SPARKJURY_API_TOKEN` 或 `serve --token`。设了之后除 /health 外所有路由都要 `Authorization: Bearer` 或 `?token=`；Cockpit 页第一次带 ?token= 打开后记在浏览器里，之后自动附带。**没设 token 时只服务回环来的请求**：绑公网又不给 token，`sparkjury serve` 直接拒绝启动（exit 2），`deploy/dgx/start_judges.sh` 在起 tmux、碰 vLLM 之前就把它拦掉——以前只打一句警告，日志里滚过去谁也没看见，而节点手册的红线是"8888 和 9000 上对外提供的服务必须有鉴权"。这是节点手册"公网端口必须加访问控制"的要求。
+- 请求里的路径都要归位：`run_id` 只能是单层目录名（`RunManager.run_dir()` 是所有读写的公共出口），`db` 必须落在 `runs_dir` 之内，`config_path` 必须落在服务进程工作目录之内，越界一律 400。`reset_db` 的 `unlink()` 只会作用在 `runs_dir` 之内，越界让这次 run 明确失败而不是删掉宿主机上的任意文件。
+- `tests/test_m10_deploy.py`：18 个用例：token 拒绝与放行、环境变量来源、默认关闭、页面转发 token、绑公网无 token 拒绝启动、部署脚本在动手前拦下空 token；脚本齐全且 bash -n 通过；env.example 覆盖脚本用到的全部变量；三处配置里端口一致、vLLM 只绑回环、显存比例之和留有余量；tau2 脚本的 Agent 与模拟用户用不同模型。
 
 **自测结果**：`uv run pytest` 96 passed, 3 skipped。
 

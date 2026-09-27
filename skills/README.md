@@ -18,17 +18,27 @@ and the layout used by the [NVIDIA/skills](https://github.com/NVIDIA/skills) reg
 | `sparkjury-clarify` | `tools/` 桥接脚本（v0.1） | the only pack writer during the clarification stage |
 | `sparkjury-govern` | `tools/` 桥接脚本（v0.1） | pack freeze/thaw + decision ledger + golden-pool projections |
 
-Each directory contains:
+Two tiers, two gates（门禁分层）:
+
+**六个阶段 skill**（`sparkjury-clean/evalset/score/cluster/report/regress`，由 `scripts/gen_skills.py` 生成）——三件套：
 
 - `SKILL.md` — frontmatter (`name`, `description`, `license`, `compatibility`, `metadata`) + instructions
-- `skill-card.md` — governance metadata: NVIDIA registry template (owner, risk, references, output) + `Data handling` and `Risk level` sections
+- `skill-card.md` — governance metadata required by the NVIDIA registry
+- `scripts/run.py` — thin wrapper around the CLI; extra arguments are passed through
+
+结构门：`python3 scripts/validate_skills.py skills`（11/11 valid，全量适用）。
+
+**五个治理 skill**（`sparkjury-arbitrate/calibrate/clarify/govern/prioritize`，手工维护，勿加入生成器）——在三件套之上再加：
+
 - `schemas/io.schema.json` — I/O contract for the stage's artifacts (JSON Schema)
 - `evals/evals.json` — 3 registry routing/behaviour/guard cases
 - `references/` — deep protocol notes loaded on demand
 - `BENCHMARK.md` — how to benchmark this skill and what counts as pass
 
-Structure gate: `python3 tools/lint_skills.py --skills-dir skills` (superset of `scripts/validate_skills.py`: adds schemas/evals/pyc checks).
-- `scripts/run.py` — thin wrapper around the CLI; extra arguments are passed through
+结构门：`python3 tools/lint_skills.py --skills-dir skills --only sparkjury-arbitrate,sparkjury-calibrate,sparkjury-clarify,sparkjury-govern,sparkjury-prioritize`
+（六件套检查只对治理五个生效；给六个阶段 skill 补六件套是后续 PR 的事，此前对它们跑该 lint 会如实报缺件）。
+仓库级检查（pyc / 禁入路径，任何状态可跑）：`python3 tools/lint_skills.py --repo-only`。
+
 
 ## Install into an agent
 

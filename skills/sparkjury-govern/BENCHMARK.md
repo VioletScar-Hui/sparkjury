@@ -16,7 +16,7 @@ python3 skills/sparkjury-govern/scripts/govern.py --selftest   # 直接跑主脚
 
 # 3. 治理演练（注意：冻结类动作只作用于仓库内 standards/scenario-pack/）
 # 3a. 先验证路径守卫：指向副本必须被拒绝（不应有输出写盘）
-cp -r standards/scenario-pack /tmp/gp/scenario-pack
+mkdir -p /tmp/gp && cp -r standards/scenario-pack /tmp/gp/scenario-pack
 python3 skills/sparkjury-govern/scripts/run.py --pack-dir /tmp/gp/scenario-pack verify
 #    期望：退出码 2 + failed 事件（pack_freeze.py 的 PACK_DIR 由其自身位置决定）
 # 3b. verify 只读，可对真实 pack 直接跑（结果写 governance_log.json）

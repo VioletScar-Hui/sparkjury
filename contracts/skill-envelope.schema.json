@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eval-agent.local/contracts/skill-envelope.schema.json",
+  "title": "SkillEnvelope",
+  "description": "每个 skill 的统一输出信封。payload 形状由各 skill 自己的 schemas/io.schema.json 定义；envelope 层保证所有产出一致携带 provenance。",
+  "type": "object",
+  "required": ["manifest", "skill", "payload"],
+  "properties": {
+    "manifest": { "$ref": "run-manifest.schema.json" },
+    "skill": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "pack_hash": { "type": "string" }
+      }
+    },
+    "payload": { "type": "object" },
+    "degraded_flags": { "type": "array", "items": { "type": "string" } }
+  }
+}

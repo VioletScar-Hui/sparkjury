@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import queue
@@ -16,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from sparkjury import __version__
 from sparkjury.api import dgx as dgx_mod
-from sparkjury.api.runs import RunManager
+from sparkjury.api.runs import InvalidRunId, RunManager, check_run_id, resolve_within
 from sparkjury.harness import EventKind, RunConfig, Stage
 from sparkjury.report import build_card
 from sparkjury.store import TraceStore
@@ -40,31 +41,78 @@ class Confirm(BaseModel):
 
 
 def create_app(runs_dir: str | Path = "runs", *, dgx_endpoints: list[dict[str, str]] | None = None, probe_endpoints: bool = True,
-               token: str | None = None) -> FastAPI:
+               token: str | None = None, config_root: str | Path | None = None) -> FastAPI:
     """`token` (or env SPARKJURY_API_TOKEN) protects every route except /health: pass it as
-    `Authorization: Bearer <token>` or `?token=<token>` (EventSource cannot set headers)."""
+    `Authorization: Bearer <token>` or `?token=<token>` (EventSource cannot set headers).
+
+    没设 token 时只服务本机来的请求（见 `_is_local_client`）：节点手册的红线是「8888 和 9000 上对外
+    提供的服务必须有鉴权」，所以「没配 token 就把服务敞开给公网」不能是一个允许的默认值。进程内的
+    ASGI 调用（`TestClient`）没有网络对端，按本机算，测试和嵌入式用法照旧。
+
+    `config_root`（默认当前工作目录）圈定 `POST /runs` 里 `config_path` 的允许范围：调用方只能指向
+    服务进程自己目录树里的配置文件，不能拿这个字段当「读宿主机任意路径」的开关。
+    """
     app = FastAPI(title="SparkJury API", version=__version__)
     mgr = RunManager(runs_dir)
     app.state.manager = mgr
     api_token = token if token is not None else os.environ.get("SPARKJURY_API_TOKEN") or None
     app.state.token = api_token
+    cfg_root = Path(config_root).resolve() if config_root is not None else Path.cwd()
 
     @app.middleware("http")
     async def _auth(request: Request, call_next):
-        if api_token and request.url.path not in ("/health",):
+        if request.url.path in ("/health",):
+            return await call_next(request)
+        if api_token:
             auth = request.headers.get("authorization", "")
             given = auth[7:] if auth.lower().startswith("bearer ") else request.query_params.get("token", "")
             if not given or not secrets.compare_digest(given, api_token):
                 return JSONResponse({"detail": "unauthorized: pass Authorization: Bearer <token> or ?token="}, status_code=401)
+        elif not _is_local_client(request):
+            # 不靠"启动时打没打警告"来保证：不管这个 app 是怎么被起起来的（uvicorn 直接指向它、
+            # 别人写脚本 import 它），公网来的请求一律拒掉。
+            return JSONResponse(
+                {"detail": "refusing unauthenticated access from a non-loopback client: set SPARKJURY_API_TOKEN (or serve --token)"},
+                status_code=403,
+            )
         return await call_next(request)
 
     # ---- helpers ----------------------------------------------------------
 
+    def _run_dir_or_400(run_id: str) -> Path:
+        """run_id -> runs_dir 下的目录；非法 run_id 报 400，不让它在文件系统上跳出去。"""
+        try:
+            return mgr.run_dir(run_id)
+        except InvalidRunId as e:
+            raise HTTPException(400, str(e)) from e
+
     def _manifest_or_404(run_id: str) -> dict[str, Any]:
+        _run_dir_or_400(run_id)
         m = mgr.manifest(run_id)
         if not m:
             raise HTTPException(404, f"run {run_id} not found")
         return m
+
+    def _config_path_or_400(config_path: str) -> Path:
+        """config_path 只能指向 config_root 之内的真文件。"""
+        try:
+            p = resolve_within(cfg_root, config_path, "config_path")
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        if not p.is_file():
+            raise HTTPException(400, f"config not found: {config_path}")
+        return p
+
+    def _db_path_or_400(db: str) -> str:
+        """调用方给的 db 必须在 runs_dir 之内。
+
+        以前这个字段原样进 RunConfig，而 reset_db 的库会在开跑前被 unlink()：
+        一个 POST /runs {"demo": true, "db": "<任意路径>"} 就能删掉宿主机上的任意文件。
+        """
+        try:
+            return str(resolve_within(mgr.runs_dir, db, "db"))
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
 
     def _store(run_id: str) -> TraceStore:
         _manifest_or_404(run_id)
@@ -78,17 +126,18 @@ def create_app(runs_dir: str | Path = "runs", *, dgx_endpoints: list[dict[str, s
     @app.post("/runs", status_code=202)
     def start_run(body: StartRun) -> dict[str, Any]:
         if body.demo:
-            cfg = RunConfig.demo(run_id=body.run_id, db=body.db)
+            cfg = RunConfig.demo(run_id=body.run_id, db=None)
         elif body.config_path:
-            if not Path(body.config_path).exists():
-                raise HTTPException(400, f"config not found: {body.config_path}")
-            cfg = RunConfig.from_toml(body.config_path)
-            if body.run_id:
-                cfg.run_id = body.run_id
-            if body.db:
-                cfg.db = body.db
+            cfg = RunConfig.from_toml(_config_path_or_400(body.config_path))
         else:
             raise HTTPException(400, "give demo=true or config_path")
+        if body.run_id:
+            try:
+                cfg.run_id = check_run_id(body.run_id)
+            except InvalidRunId as e:
+                raise HTTPException(400, str(e)) from e
+        if body.db:
+            cfg.db = _db_path_or_400(body.db)
         if body.stages:
             try:
                 cfg.stages = [Stage(s.upper()) for s in body.stages]
@@ -100,6 +149,8 @@ def create_app(runs_dir: str | Path = "runs", *, dgx_endpoints: list[dict[str, s
             cfg.db = str(Path(runs_dir) / cfg.run_id / "sparkjury.db")
         try:
             run_id = mgr.start(cfg)
+        except InvalidRunId as e:
+            raise HTTPException(400, str(e)) from e
         except ValueError as e:
             raise HTTPException(409, str(e)) from e
         return {"run_id": run_id, "status": "running", "events": f"/runs/{run_id}/events"}
@@ -165,7 +216,7 @@ def create_app(runs_dir: str | Path = "runs", *, dgx_endpoints: list[dict[str, s
 
     @app.get("/runs/{run_id}/card")
     def get_card(run_id: str) -> dict[str, Any]:
-        p = mgr.run_dir(run_id) / "card" / "card.json"
+        p = _run_dir_or_400(run_id) / "card" / "card.json"
         if p.exists():
             return json.loads(p.read_text(encoding="utf-8"))
         with _store(run_id) as store:
@@ -173,7 +224,7 @@ def create_app(runs_dir: str | Path = "runs", *, dgx_endpoints: list[dict[str, s
 
     @app.get("/runs/{run_id}/card.html", response_class=HTMLResponse)
     def get_card_html(run_id: str) -> str:
-        p = mgr.run_dir(run_id) / "card" / "card.html"
+        p = _run_dir_or_400(run_id) / "card" / "card.html"
         if p.exists():
             return p.read_text(encoding="utf-8")
         from sparkjury.report import render_html
@@ -274,6 +325,24 @@ def create_app(runs_dir: str | Path = "runs", *, dgx_endpoints: list[dict[str, s
         return p.read_text(encoding="utf-8")
 
     return app
+
+
+def _is_local_client(request: Request) -> bool:
+    """请求是不是来自本机。
+
+    `request.client` 由 ASGI 服务器按真实 socket 填，调用方改不了。不是 IP 的（`TestClient` 用的
+    "testclient"）说明是进程内调用，根本没有网络对端，按本机算；IPv4-mapped 的
+    `::ffff:127.0.0.1` 也算本机。
+    """
+    host = request.client.host if request.client else None
+    if not host:
+        return True
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return True
+    mapped = getattr(addr, "ipv4_mapped", None)
+    return bool(addr.is_loopback or (mapped is not None and mapped.is_loopback))
 
 
 def _sse(event: str, data: str) -> str:

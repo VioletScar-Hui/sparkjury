@@ -50,6 +50,11 @@ scenario pack 从根 `scenario-pack/` 改为 `standards/scenario-pack/`。
 
 ## 输入
 
+> **v0.1 生产者缺位声明**：下表的 calibration 集（`sets.calibration`）、金标票（votes/golds）
+> 在 sparkjury 当前运行时**没有生产者**——`sparkjury` 的 evalset 产扁平 trace_id 数组，
+> 不产三态集与金标配对。本 skill 现阶段吃按 `schemas/io.schema.json` 制备的 fixture
+> （见 BENCHMARK §行为基准），CLI 侧接口需求已提给滨辉（docs/PROPOSAL-skill-governance.md D4）。
+
 | 输入 | 来源 | 契约 |
 |---|---|---|
 | calibration 集 | evalset 的 `sets.calibration` | 全条目 `has_golden_outcome == true` |

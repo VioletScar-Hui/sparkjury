@@ -105,13 +105,20 @@ sync 会把当前 commit 记到节点上的 `~/sparkjury/.synced-from`，下次 
 uv run --group ops python scripts/node.py run "cp -r ~/sparkjury ~/sparkjury-<你的名字>"
 ```
 
+副本不是复制完就能用的，下面两条不处理，就会出现"测了等于没测"：
+
+- 副本 `.venv` 里的 `_editable_impl_sparkjury.pth` 写的是**绝对路径**，还指向主树的 `src`，`import sparkjury` 拿到的仍是主树代码。把它改成副本自己的 `src`。
+- 更隐蔽的一条：`cp -r` 出来的 console script（`pytest` 这些）shebang 也是绝对路径，仍然指向**主树**那份 `.venv/bin/python`。于是 `uv run pytest` 是用主树的解释器在主树代码上跑测试，副本里的改动一行都没跑到（副本自带的 `sparkjury` 命令反而可能是对的，因为 uv 重装过它，别拿它当参照）。烟测第一步因此写成 `uv run python -m pytest`，走副本自己的解释器。
+
+改完先确认一句话再往下走：`uv run python -c "import sparkjury;print(sparkjury.__file__)"`，路径里得是副本的名字。用完删掉：`rm -rf ~/sparkjury-<你的名字>`。
+
 ## 第四步：部署完的冒烟验证
 
 三样，缺一样都不算部署通过。
 
 ```bash
-# 1. 测试
-uv run --group ops python scripts/node.py run "cd ~/sparkjury && ~/.local/bin/uv run pytest -q"
+# 1. 测试（在副本里必须写成 python -m pytest，理由见上面那两条）
+uv run --group ops python scripts/node.py run "cd ~/sparkjury && ~/.local/bin/uv run python -m pytest -q"
 # 2. 服务与监听地址
 uv run --group ops python scripts/node.py run "cd ~/sparkjury && bash deploy/dgx/status.sh"
 # 3. 一条真实 run

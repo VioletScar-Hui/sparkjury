@@ -17,10 +17,10 @@
     "question": "用户说：\"clarify 的提案我批了，把 v0.2 冻上吧。\"（当前 pack.manifest.json state=DRAFT，version=0.1.0，governance/events.jsonl 里已有 evt-0007 decision approve_pack_diff。）请按 govern 的 SOP 说明完整步骤与顺序，以及每一步写入哪个文件。",
     "expected_skill": "sparkjury-govern",
     "expected_script": "scripts/govern.py",
-    "ground_truth": "顺序固定：(1) 调 bump --summary <变更摘要> --decision-event evt-0007，版本 0.1.0→0.2.0 并写 pack.manifest.json 的 history；(2) 调 freeze --summary <同一摘要> --decision-event evt-0007，由 scripts/pack_freeze.py 计算 frozen_hash 并写 pack.manifest.json 的 state=FROZEN/frozen_hash；(3) 追加 event_type=checkpoint 事件（artifact=scenario-pack/retail-default、hash=frozen_hash、resumable_from=false）到 governance/events.jsonl；(4) 写 governance/pack_history.json（bump + freeze 两条）与 governance/governance_log.json。产物：新的 pack_hash 成为此后回归对比的唯一基准；不得手改 rubrics/taxonomy/thresholds 等 pack 内容文件；frozen_at 由 pack_freeze.py 以人工确认日期写入，权威时间戳以 ledger checkpoint 事件为准。",
+    "ground_truth": "顺序固定：(1) 调 bump --summary <变更摘要> --decision-event evt-0007，版本 0.1.0→0.2.0 并写 pack.manifest.json 的 history；(2) 调 freeze --summary <同一摘要> --decision-event evt-0007，由 tools/pack_freeze.py 计算 frozen_hash 并写 pack.manifest.json 的 state=FROZEN/frozen_hash；(3) 追加 event_type=checkpoint 事件（artifact=standards/scenario-pack/retail-default、hash=frozen_hash、resumable_from=false）到 governance/events.jsonl；(4) 写 governance/pack_history.json（bump + freeze 两条）与 governance/governance_log.json。产物：新的 pack_hash 成为此后回归对比的唯一基准；不得手改 rubrics/taxonomy/thresholds 等 pack 内容文件；frozen_at 由 pack_freeze.py 以人工确认日期写入，权威时间戳以 ledger checkpoint 事件为准。",
     "expected_behavior": [
       "Bumps the version and writes pack.manifest.json history before freezing, citing the approve_pack_diff event id evt-0007 as evidence",
-      "Delegates hash computation to scripts/pack_freeze.py rather than reimplementing it",
+      "Delegates hash computation to tools/pack_freeze.py rather than reimplementing it",
       "Appends a checkpoint event (artifact/resumable_from/hash) to the append-only ledger after the freeze succeeds",
       "Records both bump and freeze entries in pack_history.json and the action in governance_log.json",
       "States that the new pack_hash is the only legitimate regression baseline and that no pack content file was hand-edited"

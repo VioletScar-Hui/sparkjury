@@ -38,6 +38,11 @@ allowed-tools: Read Bash Write
 **不用于**：定位根因（cluster 已划边界）、估算具体工时、做技术方案选型、
 比较两轮回归（那是 `regress`）。
 
+> **v0.1 生产者缺位声明**：本 skill 期望的 `clusters[]`（F 编号标签 + `severity_max` 序数 +
+> `trace_ids`）与 sparkjury 运行时产物（`FailureLabel` 文本标签 + `severity` 浮点 +
+> `member_trace_ids`）形状不同。直接喂 `sparkjury cluster` 产物会**全量拒排**（fail-safe，
+> 每条带 reason，见 BENCHMARK 真实产物三步）；映射表见 BENCHMARK，正式对齐走 pack v0.2（D3）。
+
 ## 输入
 
 | 输入 | 来源 | 说明 |

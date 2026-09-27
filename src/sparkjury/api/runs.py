@@ -4,16 +4,55 @@ from __future__ import annotations
 
 import json
 import queue
+import re
 import threading
 from pathlib import Path
 from typing import Any
 
 from sparkjury.harness import Event, EventBus, EventKind, Orchestrator, RunConfig
 
+# run_id 会被直接当成一层目录名拼进 runs_dir，所以只收单层名字。
+RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+class InvalidRunId(ValueError):
+    """run_id 不是合法的单层目录名（带分隔符、`..`、以点开头、空、超长）。"""
+
+
+def check_run_id(run_id: str) -> str:
+    """校验 run_id 只能是一层目录名，返回原值。
+
+    run_id 从 URL 和请求体两处进来，随后被拼成 `runs_dir/<run_id>/manifest.json`、`card/card.html`、
+    `confirm.json`、`events.jsonl`。以前这里一个字符都不校验。URL 那条路碰巧是安全的：Starlette 的
+    `{run_id}` 默认只匹配 `[^/]+`，斜杠根本进不来。但请求体那条路没有任何东西挡着，实测
+    `POST /runs {"demo": true, "run_id": "../escape"}` 返回 202，并在 runs_dir 外面写下了
+    manifest.json、events.jsonl、evalset.json、card/ 和 sparkjury.db。路由碰巧挡住不等于校验。
+
+    这里刻意不做"清洗"（把 `/` 换成 `_` 之类）：那会让一个非法输入悄悄变成另一个合法 id，
+    调用方以为自己在写 A，实际写到了 B。非法就是非法，报错让调用方自己改。
+    """
+    if not isinstance(run_id, str) or not RUN_ID_RE.match(run_id):
+        raise InvalidRunId(f"invalid run_id: {run_id!r} (只允许单层目录名：字母数字开头，可含 . _ -，最长 128)")
+    return run_id
+
+
+def resolve_within(base: str | Path, candidate: str | Path, what: str) -> Path:
+    """把调用方给的路径归位到 base 之内，跳出去就报错，返回归位后的绝对路径。
+
+    用 resolve() 而不是字符串前缀比较，因为它会展开 symlink：`runs/link -> /etc` 这种
+    也能拦下来。相对路径按当前工作目录解释（不按 base），免得同一个相对路径在
+    「相对谁」上产生第二套含义。
+    """
+    root = Path(base).resolve()
+    p = Path(candidate).expanduser().resolve()
+    if not p.is_relative_to(root):
+        raise ValueError(f"{what} 必须位于 {root} 之内，收到 {candidate}（归位后 {p}）")
+    return p
+
 
 class RunManager:
     def __init__(self, runs_dir: str | Path = "runs"):
-        self.runs_dir = Path(runs_dir)
+        self.runs_dir = Path(runs_dir).resolve()
         self.runs_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._live: dict[str, dict[str, Any]] = {}     # run_id -> {"events": [...], "subs": set[Queue], "done": bool, "thread": Thread}
@@ -21,7 +60,8 @@ class RunManager:
     # ---- lifecycle ------------------------------------------------------------
 
     def start(self, cfg: RunConfig) -> str:
-        run_id = cfg.run_id
+        # run_id 可能来自请求体或配置文件，进任何文件写操作之前先钉死成单层目录名
+        run_id = check_run_id(cfg.run_id)
         with self._lock:
             if run_id in self._live and not self._live[run_id]["done"]:
                 raise ValueError(f"run {run_id} is already running")
@@ -66,7 +106,12 @@ class RunManager:
     # ---- reads ----------------------------------------------------------------
 
     def run_dir(self, run_id: str) -> Path:
-        return self.runs_dir / run_id
+        """run_id -> runs_dir 下的一层目录。
+
+        manifest / events / card / card.html / confirm.json 全都从这里拼路径，所以校验放在这一处：
+        守住这里，读和写就都出不去 runs_dir 了。
+        """
+        return self.runs_dir / check_run_id(run_id)
 
     def manifest(self, run_id: str) -> dict[str, Any] | None:
         s = self._live.get(run_id)

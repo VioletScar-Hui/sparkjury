@@ -163,3 +163,24 @@ def test_partial_rerun_keeps_earlier_stages_in_manifest(demo_cfg):
     assert m["stages"]["INGEST"]["n_ingested"] == 14 and m["stages"]["SCORE"]["n_verdicts"] == 156
     assert m["models"]["judges"]["judge_a"] == "mock-qwen"        # model info survives
     assert m["stages"]["CLUSTER"]["n_badcases"] == 5 and m["previous_run_at"]
+
+
+def test_reset_db_only_deletes_inside_runs_dir(tmp_path):
+    """`db` 可以从配置文件或 API 请求体来，而 reset_db 以前对任意路径无条件 unlink()。"""
+    (tmp_path / "runs" / "reset-guard").mkdir(parents=True)
+    victim = tmp_path / "victim.db"
+    victim.write_text("precious", encoding="utf-8")
+    cfg = RunConfig(run_id="reset-guard", runs_dir=str(tmp_path / "runs"), db=str(victim),
+                    reset_db=True, stages=[Stage.INGEST])
+    m = Orchestrator(cfg).run()
+    assert m["status"] == "failed" and "reset_db" in m["error"]   # 失败要写进清单，不能静默
+    assert victim.read_text(encoding="utf-8") == "precious"       # 文件还在
+
+    # runs_dir 之内的库照旧被重置
+    inside = tmp_path / "runs" / "reset-ok" / "db.sqlite"
+    inside.parent.mkdir(parents=True, exist_ok=True)
+    inside.write_text("stale", encoding="utf-8")
+    cfg2 = RunConfig(run_id="reset-ok", runs_dir=str(tmp_path / "runs"), db=str(inside),
+                     reset_db=True, stages=[Stage.INGEST])
+    Orchestrator(cfg2).run()
+    assert not inside.exists() or inside.read_bytes() != b"stale"

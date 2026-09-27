@@ -13,7 +13,7 @@
         "action": {
           "enum": ["freeze", "thaw", "verify", "bump", "ledger_append", "ledger_query",
                    "ledger_export", "proposals", "history"],
-          "description": "govern subcommand；freeze/thaw/verify 一律转调 scripts/pack_freeze.py"
+          "description": "govern subcommand；freeze/thaw/verify 一律转调 tools/pack_freeze.py"
         },
         "pack_manifest_path": { "type": "string", "description": "standards/scenario-pack/pack.manifest.json" },
         "pack_dir": { "type": "string", "description": "standards/scenario-pack/ 路径（内容只读）" },

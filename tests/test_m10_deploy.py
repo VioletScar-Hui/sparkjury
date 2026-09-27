@@ -120,3 +120,61 @@ def test_tau2_script_uses_different_models_for_agent_and_user():
     s = (DGX / "run_tau2.sh").read_text(encoding="utf-8")
     assert '--agent-llm "openai/$AGENT_MODEL"' in s and '--user-llm "openai/$JUDGE_A_MODEL"' in s
     assert "--num-trials" in s and "sparkjury ingest" in s
+
+
+# ---- 公网服务必须有鉴权：从"警告一句"改成"拒绝启动" ------------------------------------------
+
+def test_serve_refuses_public_bind_without_token(tmp_path, monkeypatch):
+    """`serve --host 0.0.0.0` 没 token 时以前只打一句警告就照常起服务，日志里滚过去谁也没看见。"""
+    import uvicorn
+    from typer.testing import CliRunner
+
+    from sparkjury.cli import app as cli_app
+
+    started = []
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: started.append(a))
+    monkeypatch.delenv("SPARKJURY_API_TOKEN", raising=False)
+    runner = CliRunner(env={"COLUMNS": "200"})
+    runs_dir = str(tmp_path / "runs")
+
+    r = runner.invoke(cli_app, ["serve", "--host", "0.0.0.0", "--port", "9000", "--runs-dir", runs_dir])
+    assert r.exit_code == 2, r.output
+    assert "SPARKJURY_API_TOKEN" in r.output and "refusing" in r.output
+    assert started == [], "拒绝启动时不该真的去 bind"
+
+    r = runner.invoke(cli_app, ["serve", "--host", "0.0.0.0", "--port", "9000", "--token", "t", "--runs-dir", runs_dir])
+    assert r.exit_code == 0 and len(started) == 1, r.output  # 给了 token 照常起
+
+    started.clear()
+    r = runner.invoke(cli_app, ["serve", "--host", "127.0.0.1", "--port", "9000", "--runs-dir", runs_dir])
+    assert r.exit_code == 0 and len(started) == 1, r.output  # 本机回环不需要 token
+
+
+@pytest.mark.skipif(BASH is None, reason="没有可用的 bash（Windows 上常见：只有 WSL 启动桩、没装 Git Bash）")
+def test_start_judges_refuses_to_start_the_api_window_without_a_token(tmp_path):
+    """部署脚本以前只 `warn` 一句就照常起 API 窗口。真跑一遍，看它是不是拦在动手之前。"""
+    dgx = tmp_path / "deploy" / "dgx"
+    dgx.mkdir(parents=True)
+    for name in ("common.sh", "start_judges.sh"):
+        shutil.copy(DGX / name, dgx / name)  # 复制到临时目录：那里没有 .env，结果不随开发机变化
+    env = {k: v for k, v in os.environ.items() if k != "SPARKJURY_API_TOKEN"}
+    env["SPARKJURY_API_TOKEN"] = ""
+    env["HOME"] = str(tmp_path / "home")  # 免得命中开发机上的 ~/envs/vllm
+    (tmp_path / "home").mkdir()
+
+    # encoding 必须钉死成 UTF-8：Windows 上 text=True 会按 cp1252 解码，脚本里 die 的中文
+    # 把读取线程打挂（UnicodeDecodeError → stdout 变 None），报出来的是无关的 TypeError。
+    # 同一个坑本仓踩过，见 docs/ESSAY_十日谈.md 结尾。scripts/certificate.py 的 _run 也是这么写的。
+    r = subprocess.run([BASH, str(dgx / "start_judges.sh")], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", env=env, timeout=120)
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, out
+    assert "SPARKJURY_API_TOKEN" in out, out
+    assert "using vLLM" not in out, "token 检查要拦在动任何东西之前（tmux、vLLM 都还没碰）"
+
+    # --no-api 是留的正当出口：不起 API 就不要求 token，脚本继续往下走
+    r = subprocess.run([BASH, str(dgx / "start_judges.sh"), "--no-api"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", env=env, timeout=120)
+    out = r.stdout + r.stderr
+    assert "SPARKJURY_API_TOKEN" not in out, out
+    assert "vLLM not found" in out, out  # 走到下一步才停，说明上一条检查确实是条件性的

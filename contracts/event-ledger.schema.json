@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eval-agent.local/contracts/event-ledger.schema.json",
+  "title": "EventLedger",
+  "description": "append-only 事件账本。可回滚（checkpoint）/可打断（暂停点）/流式（progress）/可溯源的全部底层证据。行=一条事件，只追加不改写。",
+  "type": "object",
+  "required": ["event_id", "ts", "run_id", "skill", "event_type"],
+  "properties": {
+    "event_id": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "run_id": { "type": "string" },
+    "skill": { "type": "string" },
+    "event_type": {
+      "enum": ["plan", "started", "progress", "checkpoint", "completed", "failed", "degraded", "decision"]
+    },
+    "payload": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "event_type": { "const": "checkpoint" } } },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["artifact", "hash", "resumable_from"],
+            "properties": {
+              "artifact": { "type": "string" },
+              "hash": { "type": "string" },
+              "resumable_from": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "decision" } } },
+      "then": {
+        "description": "黄金决策池的原始条目：人的每次拍板都进 ledger",
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["decision_kind", "actor", "target"],
+            "properties": {
+              "decision_kind": {
+                "enum": ["accept_card", "override_priority", "rename_cluster", "reject_proposal", "approve_pack_diff", "thaw_pack"]
+              },
+              "actor": { "type": "string" },
+              "target": { "type": "string" },
+              "rationale": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
