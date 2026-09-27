@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import typer
@@ -14,6 +15,15 @@ from sparkjury.agent.cli import agent_app
 from sparkjury.adapters import load as load_traces
 from sparkjury.models.trace import TraceSource
 from sparkjury.store import TraceStore
+
+# Windows 管道下 stdout 默认 cp1252，gates 等含中文的输出会 UnicodeEncodeError 把子进程
+# 打成 rc=1（技能封装/证书按 rc 判死活）。与 skills 封装脚本同一处理：固定 UTF-8。
+for _s in (sys.stdout, sys.stderr):
+    if hasattr(_s, "reconfigure"):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
 
 app = typer.Typer(help="SparkJury: agent evaluation harness for DGX Spark.", no_args_is_help=True)
 
