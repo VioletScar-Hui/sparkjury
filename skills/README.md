@@ -38,6 +38,27 @@ Two tiers, two gates（门禁分层）:
 结构门：`python3 tools/lint_skills.py --skills-dir skills-governance`（整目录六件套）。
 仓库级检查（pyc / 禁入路径，任何状态可跑）：`python3 tools/lint_skills.py --repo-only`。
 
+## 每个技能真正碰哪些模型
+
+上面那张表说的是「技能包了哪几条命令」，不等于「技能会调模型」。六个里只有两个会碰到模型，
+其余四个是确定性代码（读库、算数、出文件），把它们说成同一个样子会让 skill card 里的数据流描述失真。
+
+| Skill | 会碰到的模型 | 剩下的部分 |
+|---|---|---|
+| `sparkjury-clean` | 无 | 导入解析与 precheck 规则都是确定性代码 |
+| `sparkjury-evalset` | 无 | 只按 `task_id` / `limit` 挑出要评的 trace |
+| `sparkjury-score` | Judge A（8001）、Judge B（8002）、Judge C（StepFun 云，没配 key 退化成 mock）、仲裁 Jev（TypeSafe 云，没配 key 退化成 Judge A 本地仲裁并标降级） | 四个维度的打分规则、仲裁与审计逻辑 |
+| `sparkjury-cluster` | Embedding（8003，连不上退化成哈希向量）、簇标签也用 Jev（没配 key 退化成启发式规则） | 聚类算法本身是 sklearn，确定性 |
+| `sparkjury-report` | 无 | 卡片内容全部由库里已有的分数算出来 |
+| `sparkjury-regress` | 无 | pass^k 从库里算 |
+
+这是「技能 → 模型」的方向。反过来还有一层：`src/sparkjury/agent/`（M13）里模型是**调用方**，
+它自己决定调哪个技能——工具表里有 `load_skill`（读说明书）和 `run_skill`（执行技能），
+跑的时候用哪个模型由 `--model` 决定（节点上默认 `subject`，也就是 8004 上的 Qwen3-8B）。
+换句话说，技能调用哪家模型是固定的，而「谁来调技能」是可换的。
+
+每个技能的 `skill-card.md` 里 "Data handling" / "Network" 两行按这张表写，`scripts/certificate.py`
+会逐份核对，改了一处不改另一处会红。
 
 ## Install into an agent
 

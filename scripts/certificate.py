@@ -377,6 +377,47 @@ def check_misc_bindings() -> list[Result]:
     return results
 
 
+# 每个技能真正碰哪些模型。真源是 src/sparkjury/harness/orchestrator.py 各阶段的实现：
+# 只有 SCORE（三裁判）、ARBITRATE（Jev）、CLUSTER（embedding + Jev 标签）会打模型。
+SKILL_MODELS = {
+    "sparkjury-clean": ("No model is called",),
+    "sparkjury-evalset": ("No model is called",),
+    "sparkjury-score": ("Judge A", "Judge B", "Judge C", "Jev"),
+    "sparkjury-cluster": ("embedding", "Jev"),
+    "sparkjury-report": ("No model is called",),
+    "sparkjury-regress": ("No model is called",),
+}
+
+
+def check_skill_models() -> list[Result]:
+    """技能卡片不能六份一个样。
+
+    六份 `skill-card.md` 的 `Data handling` 行曾经是复制粘贴，都写着「把 trace 片段发给
+    judge 端点和 Jev 云端」——对 clean / evalset / report / regress 是错的，那四个技能一行
+    模型代码都不碰。卡片是给别人的 Agent 读的，写错等于让它以为跑这些技能会上传数据。
+    """
+    results: list[Result] = []
+    for name, wanted in SKILL_MODELS.items():
+        text = _read(f"skills/{name}/skill-card.md")
+        cells = [m.group(1) for m in re.finditer(r"^\|\s*(?:Data handling|Network)\s*\|(.*)\|\s*$",
+                                                text, re.M)]
+        blob = " ".join(cells)
+        if not cells:
+            results.append(Result(f"{name} 碰哪些模型", False, "卡片里没有 Data handling / Network 行"))
+            continue
+        if wanted == ("No model is called",):
+            leaks = [m for m in ("judge endpoint", "Jev") if m in blob]
+            ok = "No model is called" in blob and not leaks
+            detail = (f"「No model is called」={'有' if 'No model is called' in blob else '没有'}；"
+                      f"不该出现的 {leaks or '无'}")
+        else:
+            missing = [m for m in wanted if m not in blob]
+            ok = not missing
+            detail = f"写到的模型 {[m for m in wanted if m in blob]}；漏了 {missing or '无'}"
+        results.append(Result(f"{name} 碰哪些模型", ok, detail))
+    return results
+
+
 # --------------------------------------------------------------------------------------
 # 声称三：端到端流水线（全档）
 # --------------------------------------------------------------------------------------
@@ -528,6 +569,7 @@ def main(argv: list[str]) -> int:
     results += check_precheck_rules()
     results += check_api_routes()
     results += check_misc_bindings()
+    results += check_skill_models()
     if not args.fast:
         results += check_pipeline()
         results += check_wrappers()

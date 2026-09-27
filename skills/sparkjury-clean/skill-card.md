@@ -7,8 +7,8 @@
 | Product | SparkJury agent evaluation harness |
 | Underlying command | `sparkjury ingest + precheck` |
 | Risk level | write (local store) |
-| Data handling | Reads local trace files / SQLite stores only. Sends transcript excerpts to configured judge endpoints (local vLLM by default) and, when `TYPESAFE_API_KEY` is set, disagreement summaries to the Jev cloud API. Nothing else leaves the machine. |
-| Network | Optional: StepFun / Jev / vLLM endpoints as configured |
+| Data handling | Reads local trace files and writes them into a local SQLite store. No model is called: ingestion and the precheck rules are deterministic code, so no trace content leaves the machine. |
+| Network | None. |
 | Side effects | Writes to the given SQLite store and `runs/<run_id>/` |
 | Evaluation dataset | `../../data/samples/` (tau2 + OTel samples), `../../tests/` |
 | Signature | `skill.oms.sig` to be produced with `model_signing` before publishing (see `../../scripts/sign_skills.sh`) |
