@@ -55,11 +55,13 @@ evt-0002 {"event_id":"evt-0002", … "event_type":"checkpoint","payload":{…}}
 `actor` 只能是人的标识符。agent 不得作为 actor 写 approve/reject/thaw——
 否则黄金池混入机器的自我评价，整个校准链就废了。
 
-> **`override_priority` 的权威字段以 `skills/sparkjury-report/references/card-spec.md` §8.1 为准**
-> （v0.2 联调补充）。上表的 `priority:<Fxx>` 是本文件自 v0.1 起的命名空间约定，
-> 而 report 侧的卡实际写被改的 `cluster_id`（PM 语义，如 `C03`）。
-> **两种形式 govern 都收**（`_group_key()` 只取 `:` 后的部分，裸 id 原样通过），
-> 但机器匹配唯一认 `payload.taxonomy_id`（= `category_id`）——
+> **`override_priority` 的权威字段以 `contracts/cross-skill-interfaces.md` §B 为准**
+> （v0.2 联调补充；早期草案引用的 card-spec §8.1 从未落盘，内容已收编进该契约文件）。
+> `target` 用本文件自 v0.1 起的命名空间约定 `priority:<Fxx>`；PM 语义的
+> `cluster_id`（如 `C03`）如需回溯放可选的 `payload.cluster_id`。
+> **写严读宽**：写入侧 `validate_event` 强制带 `:` 前缀，拒收裸 id；
+> 读取侧（`_group_key()` 只取 `:` 后的部分）对 v0.1 旧账本的裸 id 原样通过。
+> 机器匹配唯一认 `payload.taxonomy_id`（= `category_id`）——
 > prioritize 的排序表 `by_id` 以它为键，只靠 `target` 匹配会永远落空
 > （v0.1 真实故障：PM 改了排序，下一轮毫无反应且无报错）。
 > `system_top` / `human_top` 从"建议填"升为**必填**：缺其一则该事件不可投影，

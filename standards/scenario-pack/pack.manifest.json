@@ -1,8 +1,8 @@
 {
   "pack_id": "retail-default",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "state": "FROZEN",
-  "frozen_hash": "86325dc19c927aea89593cd03ed6df08b26ad21a28122a8e466544091244d0dd",
+  "frozen_hash": "98761f3f9cdd559d53275791e3d74c98ab93753d01c2d70c30003e5a44bf1d37",
   "owner": "万凌",
   "created": "2026-09-26",
   "frozen_at": "2026-09-26",
@@ -23,6 +23,14 @@
       "decision_event_id": "evt-0002",
       "actor": "万凌",
       "previous_version": "0.1.0"
+    },
+    {
+      "version": "0.2.1",
+      "bumped_at": "2026-09-27T23:44:34+08:00",
+      "change_summary": "v0.2.1：focus 档位改块状 YAML（_yaml_lite 拒收裸键 flow，v0.2 冻结带病，语义不变）+ regress.gates 收编 severe_min=3.0（新严重簇门槛，#19/#20 生产端默认值的治理来源）",
+      "decision_event_id": "evt-0009",
+      "actor": "万凌",
+      "previous_version": "0.2.0"
     }
   ]
 }

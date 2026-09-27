@@ -79,7 +79,7 @@ def _group_key(target: str) -> str:
 
 # override_priority 事件里投影 3 必需的两个字段。v0.1 时 report 侧从未规定过它们，
 # 于是这个投影永远吃不到数据 —— 没有任何报错，只是"从来没有信号"。
-# 现在 report 的 card-spec §8 把 system_top / human_top 写成规范，这里按期收。
+# 现在 contracts/cross-skill-interfaces.md §B 把 system_top / human_top 写成必填，这里按期收。
 OVERRIDE_TOP_FIELDS = ("system_top", "human_top")
 
 

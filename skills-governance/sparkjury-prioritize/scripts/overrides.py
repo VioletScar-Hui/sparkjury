@@ -6,7 +6,8 @@ PM 在 ledger 里 decision_kind=override_priority 的人工修正，下一轮排
 
 override payload 的权威匹配键（v0.2 联调补充，见 contracts/cross-skill-interfaces.md）：
   `taxonomy_id` = category_id（形如 F04）—— apply_overrides 唯一认的键；
-  `target`      = cluster_id（形如 C03，PM 语义，report 侧规定，优先级的兼容路径）；
+  `target`      = 带命名空间前缀（override_priority 为 `priority:<Fxx>`，
+                  _ledger.validate_event 写入侧强制；裸 F\\d\\d 仅读旧账本时兼容）；
   `to_rank` / `system_top` / `human_top` = 人工名次与改序前后的 top 类。
 两条历史路径都接：只有 target 且形如 F\\d\\d 时按 target 匹配（v0.1 遗物）；
 匹配不上一律记进 `override_unmatched` 并在 stderr 打 debug 级说明，**不许静默丢弃**。
@@ -22,8 +23,8 @@ import json
 import re
 from pathlib import Path
 
-# category_id（taxonomy 标签）的形状。用来把 v0.1 遗物「target 直接写 F04」与
-# v0.2 规定的「target = cluster_id（形如 C03）」区分开 —— 只有前者能走兼容路径。
+# category_id（taxonomy 标签）的形状。用来识别 v0.1 遗物「target 直接写 F04」——
+# 只有它走兼容路径；现规范 target 带前缀（priority:F04），不会被这个形状误判。
 CATEGORY_ID_RE = re.compile(r"^F\d{2}$")
 
 

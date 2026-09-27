@@ -39,9 +39,22 @@ prioritize:
   formula_runtime: "size × mean(severity)（运行时 cluster 内实现，卡片主显）"
   formula_note: "双公式并存（PM 批准 evt-0003）：卡片主显运行时公式（简单可讲），本三因子公式作黄金池校准载体"
   focus:                         # 呈现层温度档位（v0.2 从 focus.py 技能常量收编进 pack）
-    - {name: p0, max_t: 0.35, min_severity: 3, min_share: 0.10, queue_cap: 1}
-    - {name: standard, max_t: 0.70, min_severity: 2, min_share: null, queue_cap: 3}
-    - {name: full, max_t: 1.01, min_severity: 0, min_share: null, queue_cap: null}
+    # 块状写法是硬约束：_yaml_lite 借 json.loads 解 flow 结构，裸键 {name: p0} 必拒（v0.2.1 修复）
+    - name: p0
+      max_t: 0.35
+      min_severity: 3
+      min_share: 0.10
+      queue_cap: 1
+    - name: standard
+      max_t: 0.70
+      min_severity: 2
+      min_share: null
+      queue_cap: 3
+    - name: full
+      max_t: 1.01
+      min_severity: 0
+      min_share: null
+      queue_cap: null
   top_recommendation_count: 1    # 证据卡只给一个"先修这个"，人的注意力是稀缺资源
 
 regress:
@@ -53,6 +66,7 @@ regress:
   gates:
     primary_metric: "task_pass_rate"
     new_severe_cluster_blocks: true   # 引入新的 severity>=3 类 → 不通过
+    severe_min: 3.0               # "新严重簇"的 severity 门槛（运行期加权尺度，非序数 1-3；批准 evt-0009）
     delta_min: 0.02               # 主指标提升低于 2 个百分点 → 不通过
 
 report:

@@ -73,10 +73,11 @@
 | **去掉它会怎样** | 排序器变成一个每次都给出同样错误建议、每次都被人手动推翻的黑盒 |
 | **代价** | 排序结果不再纯粹由公式决定，复算时需要同时读 ledger |
 
-**匹配键是 `taxonomy_id`，不是 `target`**（v0.2 修掉的静默失效）：report 侧
-`target = cluster_id`（PM 语义，形如 `C03`），而本 skill 排序表的键是 `category_id`
+**匹配键是 `taxonomy_id`，不是 `target`**（v0.2 修掉的静默失效）：早期草案让
+`target` 写 cluster_id（PM 语义，形如 `C03`），而本 skill 排序表的键是 `category_id`
 （形如 `F04`）。v0.1 只用 `target` 匹配，两种 id 形状不同 → PM 在卡上改排序永远
-匹配不上、无报错、无 override。`target` 形如 `F\d\d` 时仍走兼容路径（v0.1 遗物）。
+匹配不上、无报错、无 override。现在写入侧统一 `priority:<Fxx>`（validate_event
+强制带命名空间前缀）；`target` 形如 `F\d\d` 时仍走兼容路径（v0.1 遗物）。
 细则见 `contracts/cross-skill-interfaces.md` §C。
 
 这一条同时是**长期记忆的雏形**：公式是默认判断，人是校准源。

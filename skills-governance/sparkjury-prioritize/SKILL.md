@@ -126,22 +126,25 @@ PM 若不认可排序，会在证据卡上直接改。那次拍板以 `decision`
 ```json
 {"event_type": "decision",
  "payload": {"decision_kind": "override_priority", "actor": "pm-qianfu",
-             "target": "CL-F06", "taxonomy_id": "F06", "to_rank": 1,
+             "target": "priority:F06", "taxonomy_id": "F06", "to_rank": 1,
              "system_top": "F02", "human_top": "F06",
              "rationale": "冗余空转把 P99 延迟打到 8s，投诉最直接"}}
 ```
 
 **匹配键是 `taxonomy_id`，不是 `target`。** 这是 v0.2 修掉的一处跨 skill 错配：
-report 侧规定 `target = cluster_id`（PM 语义，形如 `C03`），而本 skill 的排序表
+早期草案让 `target` 写 cluster_id（PM 语义，形如 `C03`），而本 skill 的排序表
 `by_id` 的键是 `category_id`（taxonomy 标签，形如 `F06`）。v0.1 直接用
 `target in by_id` 匹配，于是 PM 在卡上改排序**永远匹配不上、不报错、也不生效**。
-现在 `target` 保留 cluster_id 不动，另立 `taxonomy_id` 作权威键。
+现在写入侧统一 `命名空间:键`（本事件为 `priority:<Fxx>`，`_ledger.validate_event`
+强制，裸 id 拒收），`taxonomy_id` 作权威匹配键；PM 语义的 cluster_id 如需回溯，
+放可选的 `payload.cluster_id`，不再占用 `target`。细则见
+`contracts/cross-skill-interfaces.md` §A/§B。
 
 各字段分工：
 
 | 字段 | 谁写 | 谁消费 | 含义 |
 |---|---|---|---|
-| `target` | report | 人 / 回溯 | PM 语义上的被改对象 = `cluster_id` |
+| `target` | report | 人 / 回溯 | 带命名空间前缀的被改对象 = `priority:<Fxx>`（写入侧强制；读旧账本时裸 id 兼容） |
 | `taxonomy_id` | report | **prioritize** | 权威匹配键 = `category_id`，排序表 `by_id` 的键 |
 | `to_rank` | report | prioritize | 人工给出的名次；缺省视为只标记不改序 |
 | `system_top` | report | govern 投影 3 | 改排序前系统的 top 类（`fixability_boost` 校准对象） |

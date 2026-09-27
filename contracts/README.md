@@ -10,6 +10,7 @@
 | `skill-envelope.schema.json` | 治理 skill 产物的统一信封（manifest+payload） | calibrate/prioritize 产物外层 |
 | `run-manifest.schema.json` | 运行五元组指纹 | prioritize/cluster 的 run-manifest 段 |
 | `trace.schema.json` | trace.v1 统一轨迹（治理层视角） | calibrate 校准集引用 |
+| `cross-skill-interfaces.md` | 跨 skill 接缝契约与事故表（target 命名空间 / override 字段与匹配键 / 标签翻译与 severity 尺度 / regress 门禁语义） | 各 SKILL.md 与代码注释统一引用此处 |
 
 ## 已知漂移（登记不隐瞒，裁决走 pack v0.2 流程，见 docs/PROPOSAL-skill-governance.md D3）
 

@@ -227,7 +227,8 @@ def selftest() -> int:
                          for p in fx),
               json.dumps([p["evidence"] for p in fx], ensure_ascii=False))
 
-        # v0.2 联调补充：report 侧按 card-spec §8 写全 payload 的事件必须能喂饱投影 3；
+        # v0.2 联调补充：report 侧按 contracts/cross-skill-interfaces.md §B 写全 payload
+        # 的事件必须能喂饱投影 3；
         # 缺 system_top/human_top 的旧事件不得被None 当键偷偷计成信号，必须在
         # override_audit 里显式曝光 —— 否则"没有信号"和"没采到字段"输出里长得一样。
         full_ev = {"event_id": "evt-full", "ts": now_iso(), "run_id": "governance",
