@@ -55,6 +55,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools"))
 from _yaml_lite import load_yaml_file, load_yaml_text  # noqa: E402,F401
 
 # re-export：govern 的公开 API 仍集中在本文件入口，调用方不需要知道拆了几个模块。
+from _golden_pool import thin_candidates  # noqa: E402
 from _golden_pool import (MIN_SUPPORT, OVERRIDE_TOP_FIELDS, PACK_PREFIX,  # noqa: E402,F401
                          audit_override_payloads, build_proposals, _group_key,
                          project_golden_pool, read_dimensions, read_facts)
@@ -138,6 +139,9 @@ def cmd_proposals(args) -> int:
     path = Path(args.ledger)
     events, corrupt = read_ledger(path)
     payload = build_proposals(events, Path(args.pack_dir), path, corrupt)
+    if getattr(args, "runs_dir", None):
+        # Add/Thin：run 产物里的消费证据 -> 解冻时的 Thin 候选清单（只给方向，不动手）
+        payload["thin_candidates"] = thin_candidates(args.runs_dir, args.pack_dir)
     out = Path(args.out) if args.out else Path(args.out_dir) / "proposals.json"
     write_json(out, payload)
     for p in payload["proposals"]:
@@ -365,6 +369,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_ledger)
 
     p = sub.add_parser("proposals", help="黄金池三类统计投影 -> proposals.json")
+    p.add_argument("--runs-dir", default=None,
+                   help="扫描 run 产物目录出 Add/Thin 候选（从未被 badcase 消费过的类/系数）")
     p.add_argument("--out", default=None)
     p.set_defaults(func=cmd_proposals)
 

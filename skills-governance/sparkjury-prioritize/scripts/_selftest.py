@@ -355,6 +355,11 @@ def selftest() -> int:
         if not (_r["ranked"] and _r["ranked"][0]["category_id"] == "F01"
                 and _r["ranked"][0].get("pinned_by_override")):
             failures.append("人工 override 必须钉住温度（p0 档也浮出）")
+        # W3 完全体：reject_proposal 等任意人类决策触碰过的类，p0 档也钉住浮出
+        _r = apply_temperature({**_base, "ranked": [dict(x) for x in _rk]}, 0.2, decided={"F01"})
+        if not any(x.get("category_id") == "F01" and x.get("pinned_source") == "human_decision"
+                   for x in _r["ranked"]):
+            failures.append("ledger 人类决策触碰过的类必须钉住温度（pinned_source=human_decision）")
         _r = apply_temperature({"ranked": [dict(_rk[1])], "top_recommendation": {"category_id": "F01"},
                                 "override_applied": [], "override_unmatched": []}, 0.1)
         if _r["top_recommendation"] is not None or "不是无 badcase" not in _r["temperature"]["note"]:

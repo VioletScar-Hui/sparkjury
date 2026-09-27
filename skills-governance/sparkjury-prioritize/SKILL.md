@@ -173,8 +173,10 @@ selftest 第 6 组用输出 sha256 验证这一点，第 8 组验权威键与不
 | standard | 0.35–0.70 | severity≥2 | 上限 3 |
 | full | t≥0.70 | 全部（含低严重度） | 不设限 |
 
-三条红线：①抑制≠删除（suppressed 逐条带 reason）；②人工 override 钉住温度（人的决策
-不被滑杆压掉）；③不传温度=行为与旧版逐字节一致。全部有 selftest 断言（第 9 组）。
+四条红线：①抑制≠删除（suppressed 逐条带 reason）；②人工 override 钉住温度；③**任何**
+ledger 人类决策（accept_card/reject_proposal/override_priority）触碰过的类都钉住——外部
+情报警示「滑杆调低不能把不可逆决策静默吞掉」的落地，`pinned_source` 区分 override 与
+human_decision；④不传温度=行为与旧版逐字节一致。全部有 selftest 断言（第 9 组）。
 
 诚实边界：这是**呈现层**温度——badcase 判定与聚类已发生，温度只管"多少浮上卡片"。
 **判定层**温度（badcase 阈值/聚类粒度随温度变）需运行时配合，见接口需求文档；档位

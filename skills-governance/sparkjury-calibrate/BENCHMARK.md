@@ -86,3 +86,14 @@ python3 skills-governance/sparkjury-calibrate/scripts/compute_profile.py \
 - 结论：画像可用 / 画像不可用（附原因）
 - 未验证项照抄 §未覆盖项，有新项就补
 ```
+
+## reliability.py（2026-09-27 新增）
+
+```bash
+python3 skills-governance/sparkjury-calibrate/scripts/reliability.py --selftest   # 5 组断言
+python3 skills-governance/sparkjury-calibrate/scripts/reliability.py --pairs <pairs.json> --out report.json
+```
+通过标准：selftest 全绿；过度自信 fixture（0.9 置信 30% 正确）ECE≥0.4 且判 overconfident。
+真值数据源：黄金池 events.jsonl（PM 拍板）或校准集 checker 结果，v0.1 需手工拼 pairs，
+自动拼接待接口③（decision 事件生产）落地。
+

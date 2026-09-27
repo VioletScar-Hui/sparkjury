@@ -111,6 +111,16 @@ envelope.payload
 7. **落盘**：`judge_profile.json` + `checkpoint` 事件 + `completed` 事件 + run manifest 五元组。
    画像同时作为**黄金决策池的输入之一**交给 govern 观察趋势。
 
+
+## 可靠性曲线与 ECE（scripts/reliability.py，v0.1 新增）
+
+回答「裁判/仲裁说 80% 把握时到底多少次是对的」。背景：Jev 官方从未公布 ECE，且其
+文档自认置信度只是相对偏好；我们有别人没有的真值——黄金池 PM 拍板与确定性 checker。
+`python3 scripts/reliability.py --pairs pairs.json` 输出 10-bin 可靠性表 + ECE +
+ASCII 曲线 + overconfident/underconfident 判定。红线：n<30 强制标 low_sample
+（噪声不当校准结论）、空 bin 不伪造、非法置信度显式拒绝。selftest 含
+「Jev 财报实测形态」负例（高置信押错 → 必须判 overconfident）。
+
 ## Edge cases
 
 所有降级进 `degraded_flags`，不静默。

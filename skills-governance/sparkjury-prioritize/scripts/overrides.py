@@ -153,3 +153,37 @@ def apply_overrides(ranked: list, overrides: list) -> tuple:
                         "from_rank": cur + 1, "to_rank": to})
         used.add(cid)
     return ranked, applied, unmatched
+
+def decided_categories(path) -> set:
+    """ledger 里**任意** decision 事件人工触碰过的 taxonomy 类（accept_card /
+    reject_proposal / override_priority 的 payload.taxonomy_id 与 human_top）。
+
+    用途：呈现层温度的完全体钉住——外部情报（2026-09-27）警示"滑杆调低不能把
+    不可逆决策静默吞掉"。人拍过板的类（无论接受、拒绝还是改序）永远浮出，
+    直到有新决策覆盖；温度只压"人还没看过的"。
+    """
+    import json as _json
+    from pathlib import Path as _P
+    decided = set()
+    p = _P(path)
+    if not p.exists():
+        return decided
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ev = _json.loads(line)
+        except Exception:
+            continue
+        if ev.get("event_type") != "decision":
+            continue
+        payload = ev.get("payload") or {}
+        if payload.get("decision_kind") not in ("accept_card", "reject_proposal", "override_priority"):
+            continue
+        for k in ("taxonomy_id", "human_top"):
+            v = payload.get(k)
+            if isinstance(v, str) and v:
+                decided.add(v)
+    return decided
+

@@ -19,7 +19,7 @@ from pathlib import Path
 # 保证 `python3 /任意/路径/pipeline.py` 也能 import 同目录模块
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from overrides import load_overrides  # noqa: E402
+from overrides import decided_categories, load_overrides  # noqa: E402
 from pack_binding import resolve_pack_binding  # noqa: E402
 from focus import apply_temperature
 from ranking import load_thresholds, rank  # noqa: E402
@@ -100,7 +100,8 @@ def run(clusters_path: Path, thresholds_path: Path, out_dir: Path, run_id: str,
 
     result = rank(clusters, thresholds, overrides, total)
     # 呈现层温度（万凌 2026-09-27 产品定义）：None=关，输出与旧版逐字节一致
-    result = apply_temperature(result, temperature)
+    decided = decided_categories(overrides_path) if (overrides_path and temperature is not None) else set()
+    result = apply_temperature(result, temperature, decided)
 
     out = {
         "ranked": result["ranked"],

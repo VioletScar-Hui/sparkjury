@@ -40,7 +40,7 @@ def profile_of(temperature: float) -> tuple[str, int, float | None, int | None]:
     return "full", 0, None, None  # pragma: no cover — 1.01 上界已兜住
 
 
-def apply_temperature(result: dict, temperature: float | None) -> dict:
+def apply_temperature(result: dict, temperature: float | None, decided: set | None = None) -> dict:
     """rank() 之后调用。温度为 None 时原样返回（不加任何字段，保证旧输出逐字节不变）。
 
     返回的 result 中：ranked 只剩浮出的类（rank 重编号），top_recommendation 从浮出集
@@ -49,13 +49,18 @@ def apply_temperature(result: dict, temperature: float | None) -> dict:
     if temperature is None:
         return result
     name, min_sev, min_share, cap = profile_of(temperature)
+    # 钉住集 = 本轮 override 生效的类 ∪ ledger 里任意人类决策触碰过的类（decided）。
+    # 后者是外部情报 W3 的落地：不可逆决策（如 reject_proposal「本轮不修」）绝不被
+    # 高温度档静默吞掉——人看过的东西只能由人再收起来。
     pinned = {a.get("category_id") for a in result.get("override_applied") or []}
+    pinned |= set(decided or ())
 
     surfaced, suppressed = [], []
     for r in result["ranked"]:
         cid = r.get("category_id")
         if cid in pinned:
-            surfaced.append(dict(r, pinned_by_override=True))
+            src = "override" if any((a.get("category_id") == cid) for a in result.get("override_applied") or []) else "human_decision"
+            surfaced.append(dict(r, pinned_by_override=True, pinned_source=src))
             continue
         sev = r.get("severity")
         share = r.get("frequency")

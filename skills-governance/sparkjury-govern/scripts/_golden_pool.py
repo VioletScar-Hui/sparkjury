@@ -242,3 +242,71 @@ def build_proposals(events: list, pack_dir: Path, ledger_path: Path, corrupt: in
         # override 决策的"可投影性"审计：投影 3 出不来信号时，先看这里是不是上游没采到字段
         "override_audit": audit,
     }
+
+def thin_candidates(runs_dir, pack_dir) -> dict:
+    """Add/Thin 原则（外部情报 2026-09-27：「Harness 组件不是永久资产，去留由真实任务
+    的运行证据决定」）落到 pack：扫描历史 run 产物，找出**从未被任何 badcase 消费过**
+    的 taxonomy 类与 fixability 系数——它们是下一次 pack 解冻时的 Thin 候选。
+
+    只给方向不动手：输出候选清单与证据基数，删不删由人走 clarify→govern 流程。
+    数据源两种形状都认：runs/<id>/clusters.json（接口②落地后）与
+    runs/<id>/card/card.json（现状）。扫不到任何 run 时如实返回 basis_runs=0，
+    不产生候选——零证据不能当"没人用"的证据。
+    """
+    import json as _json
+    from pathlib import Path as _P
+    runs = _P(runs_dir)
+    observed, n_runs = set(), 0
+    if runs.is_dir():
+        for d in sorted(runs.iterdir()):
+            if not d.is_dir():
+                continue
+            labels = set()
+            for cand in (d / "clusters.json", d / "card" / "card.json"):
+                if not cand.exists():
+                    continue
+                try:
+                    doc = _json.loads(cand.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                for cl in (doc.get("clusters") or []):
+                    lab = cl.get("label") or cl.get("taxonomy_id")
+                    if isinstance(lab, str) and lab:
+                        labels.add(lab)
+            if labels:
+                observed |= labels
+                n_runs += 1
+    pack = _P(pack_dir)
+    defined, fix_keys = set(), set()
+    tax = pack / "taxonomy.yaml"
+    if tax.exists():
+        for c in load_yaml_file(tax).get("categories") or []:
+            if isinstance(c, dict) and c.get("id"):
+                defined.add(str(c["id"]))
+    thr = pack / "thresholds.yaml"
+    if thr.exists():
+        pri = (load_yaml_file(thr).get("prioritize") or {})
+        fix_keys = {str(k) for k in (pri.get("fixability_boost") or {}).keys()}
+    if n_runs == 0:
+        return {"basis_runs": 0, "observed_labels": [], "unobserved_categories": [],
+                "unused_fixability_keys": [],
+                "note": "无可用 run 产物——零证据不构成 Thin 依据，不产生候选"}
+    protected = {"F99"}  # 人工兜底队列永不进 Thin 候选
+    if observed and defined and not (observed & defined):
+        # 观测标签与 pack 类零交集 = 两套命名空间没对齐（正是 D3 待裁决的
+        # FailureLabel vs F 编号差异）。此时"全部 F 类都没被消费"是空间错配的
+        # 假象，不是 Thin 证据——如实报告并拒绝产生候选，防止误删整套分类。
+        return {"basis_runs": n_runs, "observed_labels": sorted(observed),
+                "unobserved_categories": [], "unused_fixability_keys": [],
+                "namespace_mismatch": True,
+                "note": ("观测标签与 pack 分类零交集（如运行时 FailureLabel vs pack F 编号，"
+                         "见 D3 裁决）——先统一命名空间再谈 Add/Thin，本轮不产生候选")}
+    return {
+        "basis_runs": n_runs,
+        "observed_labels": sorted(observed),
+        "unobserved_categories": sorted((defined - observed) - protected),
+        "unused_fixability_keys": sorted((fix_keys - observed) - protected),
+        "note": ("Thin 候选=定义了但 N 轮 run 里从未出现的类/系数；只是解冻时的讨论清单，"
+                 "删除必须走 clarify 提案→人批准→govern 冻结"),
+    }
+

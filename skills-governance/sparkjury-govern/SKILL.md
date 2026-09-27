@@ -102,6 +102,19 @@ DRAFT ──freeze(需 checkpoint 证据)──▶ FROZEN ──thaw(需 decisio
 - FROZEN：所有 skill 只读；每次 run 的 manifest 钉同一个 `pack_hash`。
 - 回归铁律：前后两轮对比必须同 `pack_hash`；换了 pack = 新一轮评测，不是回归。
 
+
+## Add/Thin：规则消费证据（--runs-dir，v0.1 新增）
+
+外部情报（2026-09-27）："Harness 组件不是永久资产，去留由真实任务的运行证据决定。"
+`proposals --runs-dir <runs>` 扫描历史 run 产物（clusters.json 或 card/card.json），
+在 proposals.json 输出 `thin_candidates`：定义了但从未被任何 badcase 消费过的
+taxonomy 类与 fixability 系数——下一次 pack 解冻时的 Thin 讨论清单。
+
+三条防线：①F99 人工兜底队列永不进候选；②零 run 产物 = 零证据，不产生候选；
+③观测标签与 pack 类**零交集**时判 namespace_mismatch（如运行时 FailureLabel vs
+pack F 编号，正是 D3 待裁决项）并拒绝产候选——空间错配的"全没用过"是假象，
+照单全收会误删整套分类。只给方向：删除仍必须走 clarify 提案→人批准→冻结。
+
 ## Edge cases
 
 | 分支 | 触发 | 行为 | degraded_flags |
