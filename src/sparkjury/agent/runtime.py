@@ -290,6 +290,9 @@ class AgentRuntime:
             degradations.append("run aborted by caller")
         if result.replayed_calls:
             degradations.append(f"{result.replayed_calls} tool call(s) replayed from the journal on resume")
+        if result.salvaged_calls:
+            degradations.append(f"{result.salvaged_calls} tool call(s) recovered from assistant text "
+                                f"(the endpoint's tool-call parser did not match this model)")
         permissions = self.permissions.report() if self.permissions is not None else None
         if permissions and permissions["denied"]:
             degradations.append(f"{permissions['denied']} tool call(s) denied by policy")
@@ -326,6 +329,7 @@ class AgentRuntime:
             "stopped": result.stopped,
             "resumed": result.resumed,
             "replayed_calls": result.replayed_calls,
+            "salvaged_tool_calls": result.salvaged_calls,
             "compactions": result.compactions,
             "usage": dict(result.usage) or ledger_total,
             "operations": [{"id": op.id, "kind": str(op.kind), "status": str(op.status),

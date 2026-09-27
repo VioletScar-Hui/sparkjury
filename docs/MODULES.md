@@ -494,7 +494,16 @@ stdout 写事件与回执，跑 run 的活在工作线程里，所以跑着的�
 `end_turn`，看起来像自然跑完）；steering 在最后那一轮回答期间到达时，循环会再跑一轮把它冲成一条
 user 消息（以前会随 end_turn 一起丢掉）。
 
-**自测结果**：`uv run pytest tests/test_m13_agent.py tests/test_m13_durable.py tests/test_m13_toplayer.py -q` 116 个用例全绿（全离线：脚本模型 + 离线执行器，不联网不起子进程）。`uv run sparkjury agent run --demo` 端到端 5 轮 4 次工具调用，结束方式 `end_turn`，manifest 无降级项；`agent policy` 一次列清三种模式下每个工具的处置与全部红线。
+**自测结果**：`uv run pytest tests/test_m13_agent.py tests/test_m13_durable.py tests/test_m13_toplayer.py tests/test_m13_salvage.py -q` 132 个用例全绿（全离线：脚本模型 + 离线执行器，不联网不起子进程）。`uv run sparkjury agent run --demo` 端到端 5 轮 4 次工具调用，结束方式 `end_turn`，manifest 无降级项；`agent policy` 一次列清三种模式下每个工具的处置与全部红线。
+
+**再补一层：模型把工具调用写成正文时的兜底（同一天）**：三个本地端点各跑一次同一个请求才发现，
+换模型会哑火——`subject`（Qwen3-8B）与 `judge-a`（Qwen3-30B）都正常返回结构化的 tool_calls，
+`judge-b`（Nemotron）把调用写成了正文里的 `<function=load_skill><parameter=name>…`，端点配的是
+`--tool-call-parser hermes`，解析不了就整段当 content，harness 看到的是「说了要做，然后没有然后」。
+`ai.py` 的 `salvage_tool_calls()` 负责把这种写全了的调用捞出来执行：成对标签才算数，名字必须在本次
+声明过的工具表里（文档里的 `<function=…>` 示例不会被当成调用），捞走之后从正文里删掉。留痕在三处：
+会话 `note{phase:tool_salvage}`、事件流 warning、manifest 的 `salvaged_tool_calls` 与一条降级说明——
+这是兜底，不是静默修复。
 
 **验证**
 ```bash

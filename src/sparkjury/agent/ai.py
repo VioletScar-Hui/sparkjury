@@ -16,7 +16,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field, replace
-from typing import Any, Callable
+from typing import Any, Callable, Collection
 
 DEFAULT_TIMEOUT_S = 120.0
 
@@ -111,6 +111,8 @@ class Turn:
     model: str = ""
     latency_ms: float = 0.0
     error: str | None = None
+    salvaged: int = 0              # 这几个调用是从正文里捞回来的，不是服务端解析出来的
+
 
     @property
     def ok(self) -> bool:
@@ -157,7 +159,16 @@ class OpenAICompatProvider(Provider):
                         latency_ms=(time.perf_counter() - t0) * 1000)
         msg = resp.choices[0].message
         text, thinking = split_thinking(msg.content or "")
-        return Turn(text=text, thinking=thinking, tool_calls=_parse_tool_calls(msg),
+        calls = _parse_tool_calls(msg)
+        salvaged = 0
+        if not calls:
+            # 服务端没解析出来，但模型可能把调用原样写进了正文：捞一次，别让它变成「说了没做」。
+            allowed = _declared_tool_names(tools)
+            calls, cleaned = salvage_tool_calls(text, allowed)
+            if calls:
+                salvaged = len(calls)
+                text = cleaned
+        return Turn(text=text, thinking=thinking, tool_calls=calls, salvaged=salvaged,
                     usage=_parse_usage(resp), model=self.spec.model,
                     latency_ms=(time.perf_counter() - t0) * 1000)
 
@@ -205,6 +216,120 @@ def _parse_usage(resp: Any) -> dict[str, int]:
     return {k: int(getattr(usage, k, 0) or 0)
             for k in ("prompt_tokens", "completion_tokens", "total_tokens")
             if getattr(usage, k, None) is not None}
+
+
+#: 模型把工具调用写成正文时的两种形状：Hermes 那种 `<tool_call>{"name":…}</tool_call>`，
+#: 以及 `<function=名字><parameter=参数>值</parameter></function>` 那种 XML 写法。
+_BLOCK_RE = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.S | re.I)
+_FUNC_RE = re.compile(r"<function\s*=\s*([A-Za-z0-9_.\-]+)\s*>(.*?)</function>", re.S | re.I)
+_PARAM_RE = re.compile(r"<parameter\s*=\s*([A-Za-z0-9_.\-]+)\s*>(.*?)</parameter>", re.S | re.I)
+
+
+def salvage_tool_calls(text: str, allowed: Collection[str] | None = None) -> tuple[list[ToolCall], str]:
+    """从正文里把模型手写的工具调用捞出来，返回 (捞到的调用, 去掉这些块之后的正文)。
+
+    为什么要这个兜底：一个 vLLM 端点只能配一种 `--tool-call-parser`（`start_judges.sh`
+    里配的是 `hermes`），配不上的模型会把调用原样写进 content。节点上的 Nemotron 就是
+    这样——它写的是 `<function=load_skill><parameter=name>…</parameter></function>`，
+    服务端解析不了，于是 harness 这边看到的是「模型自言自语说要去调工具，然后就没有然后了」，
+    run 以一句空回答收尾。同一个 harness 换一个模型就哑火，问题不在模型，在没人接它的话。
+
+    三条自我约束，宁可漏捞也不能把示例当调用：形状必须写全（成对的标签，不是半截）、
+    名字必须在本次真的声明过的工具表里（`allowed` 为空表示不校验，只给离线测试用）、
+    捞出来的块要从正文里去掉，免得同一句话在会话里出现两遍。
+    """
+    if not text or "<" not in text:
+        return [], text
+    calls: list[ToolCall] = []
+    spans: list[tuple[int, int]] = []
+    for match in _BLOCK_RE.finditer(text):
+        got = _calls_in_block(match.group(1), allowed, len(calls))
+        if got:
+            calls.extend(got)
+            spans.append(match.span())
+    if not calls:                                 # 没有外层 <tool_call>，也认裸的 <function=…>
+        for match in _FUNC_RE.finditer(text):
+            got = _calls_in_block(match.group(0), allowed, len(calls))
+            if got:
+                calls.extend(got)
+                spans.append(match.span())
+    if not calls:
+        return [], text
+    kept, cursor = [], 0
+    for start, end in sorted(spans):
+        kept.append(text[cursor:start])
+        cursor = end
+    kept.append(text[cursor:])
+    return calls, re.sub(r"\n{3,}", "\n\n", "".join(kept)).strip()
+
+
+def _calls_in_block(block: str, allowed: Collection[str] | None, offset: int) -> list[ToolCall]:
+    """一个块里可能写着一个 JSON，也可能写着若干个 `<function=…>`。"""
+    out = _calls_from_json(block, allowed, offset)
+    if out:
+        return out
+    for i, match in enumerate(_FUNC_RE.finditer(block)):
+        name = match.group(1)
+        if allowed is not None and name not in allowed:
+            continue
+        args: dict[str, Any] = {}
+        for pm in _PARAM_RE.finditer(match.group(2)):
+            args[pm.group(1)] = _loose_value(pm.group(2))
+        out.append(ToolCall(id=f"salvaged_{offset + i + 1}", name=name, arguments=args,
+                            raw_arguments=json.dumps(args, ensure_ascii=False)))
+    return out
+
+
+def _calls_from_json(block: str, allowed: Collection[str] | None, offset: int) -> list[ToolCall]:
+    """`{"name": …, "arguments": {…}}` 这种（Hermes 的字面写法）能认就认。"""
+    start = block.find("{")
+    if start < 0:
+        return []
+    try:
+        payload = json.loads(block[start:])
+    except json.JSONDecodeError:
+        return []
+    items = payload if isinstance(payload, list) else [payload]
+    out: list[ToolCall] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        fn = item.get("function") if isinstance(item.get("function"), dict) else {}
+        name = str(item.get("name") or fn.get("name") or "")
+        if not name or (allowed is not None and name not in allowed):
+            continue
+        args = item.get("arguments") or fn.get("arguments") or {}
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                args = {"value": args}
+        if not isinstance(args, dict):
+            args = {"value": args}
+        out.append(ToolCall(id=f"salvaged_{offset + len(out) + 1}", name=name, arguments=args,
+                            raw_arguments=json.dumps(args, ensure_ascii=False)))
+    return out
+
+
+def _loose_value(raw: str) -> Any:
+    """`<parameter=args>["--db","x"]</parameter>` 里的值多半是 JSON，不是就当字符串。"""
+    stripped = raw.strip()
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        return stripped
+
+
+def _declared_tool_names(tools: list[dict[str, Any]] | None) -> set[str] | None:
+    """本次真的声明给模型的工具名。捞的时候拿它当白名单，免得把文档示例当成调用。"""
+    if not tools:
+        return None
+    names = set()
+    for item in tools:
+        name = ((item.get("function") or {}).get("name")) if isinstance(item, dict) else None
+        if name:
+            names.add(str(name))
+    return names or None
 
 
 class ScriptedProvider(Provider):

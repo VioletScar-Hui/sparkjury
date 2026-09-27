@@ -242,6 +242,32 @@ SparkJury 的 agent 跑在队里大家共用的那台 DGX Spark 上，同一个 
 - **steering 在最后那一轮回答期间到达**：以前会随 `end_turn` 一起丢掉。现在循环会再跑一轮，
   把它冲成一条 user 消息——「插话在当前回合之后生效」这句话才算真的成立。
 
+### 模型把工具调用写成了正文怎么办
+
+同一个 harness，换一个模型就有可能哑火——这件事在节点上是真发生的。三个本地端点的实测：
+
+| 端点 | 模型 | 说要调工具时发生了什么 |
+|---|---|---|
+| 8004 `subject` | Qwen3-8B | 正常返回结构化的 tool_calls，`load_skill` 真的跑起来了 |
+| 8001 `judge-a` | Qwen3-30B-A3B-Instruct-2507-FP8 | 同上 |
+| 8002 `judge-b` | Nemotron-3.5-Lightning-30B-A3B-NVFP4 | 把调用写成了正文里的 `<function=load_skill><parameter=name>…`，端点没解析出来，harness 这边看到的是「自言自语说要去调工具，然后就没有然后了」 |
+
+根子在服务端：一个 vLLM 端点只能配一种 `--tool-call-parser`（`start_judges.sh` 里是 `hermes`），
+配不上的模型格式就落回 content。以前这一轮会以一句空回答收尾，看着像模型不行，其实是没人接它的话。
+
+所以 `ai.py` 加了一层兜底 `salvage_tool_calls()`：服务端没给出结构化调用、而正文里出现了
+写全了的调用块时，把它捞出来当成真的调用执行。三条自我约束，宁可漏捞也不硬捞——
+
+- 形状必须成对写全（`<tool_call>…</tool_call>` 里套 `<function=名字>` 加 `<parameter=键>值</parameter>`，
+  或者 Hermes 那种 JSON），半截标签当没看见；
+- **名字必须在本次真的声明过的工具表里**，否则原样留在正文里。文档和说明书里到处是
+  `<function=…>` 的例子，不设这道门，抄一段文档就能变成一次真执行；
+- 捞出来的块从正文里去掉，同一句话不会在会话里出现两遍。
+
+留痕照旧：会话里加一条 `note{phase:tool_salvage}`、事件流发一条 warning、manifest 多一栏
+`salvaged_tool_calls`，并在 `degradations` 里写明「N 个工具调用是从正文里捞回来的（端点没配对应的
+tool-call parser）」。这不是悄悄修好——读 manifest 的人应该能看到这个端点的工具调用没走正常通道。
+
 ## 跟 pi 的对照
 
 | pi | 这里 | 为什么这么办 |
@@ -276,7 +302,8 @@ SparkJury 的 agent 跑在队里大家共用的那台 DGX Spark 上，同一个 
 ## 验证
 
 ```bash
-uv run pytest tests/test_m13_agent.py tests/test_m13_durable.py tests/test_m13_toplayer.py -q
+uv run pytest tests/test_m13_agent.py tests/test_m13_durable.py \
+  tests/test_m13_toplayer.py tests/test_m13_salvage.py -q
 uv run sparkjury agent run --demo            # 端到端：读说明书 → 清洗 → 打分 → 出卡片
 uv run sparkjury agent ops <run_dir>         # 操作日志与现场
 uv run sparkjury agent policy                # 三种模式下每个工具怎么判

@@ -84,6 +84,7 @@ class LoopResult:
     resumed: bool = False          # 这次是从中断处接着跑的（没有重新起一条用户消息）
     compactions: int = 0
     replayed_calls: int = 0        # 恢复时重放而没有重新执行的工具调用数
+    salvaged_calls: int = 0        # 从正文里捞回来的工具调用数（服务端没解析出来）
 
     @property
     def ok(self) -> bool:
@@ -191,6 +192,9 @@ class AgentLoop:
             if turn.tool_calls:
                 result.tool_calls += len(turn.tool_calls)
                 self._record_tool_calls(turn)
+                if turn.salvaged:
+                    result.salvaged_calls += turn.salvaged
+                    self._note_salvaged(turn.salvaged, result.turns)
                 self._run_tools(turn.tool_calls)
                 continue
             result.text = turn.text
@@ -279,6 +283,12 @@ class AgentLoop:
             text = self._steering.pop(0)
             self.session.append("message", role="user", data={"text": text, "steering": True})
             self._publish(EventKind.PROGRESS, "插入 steering 消息", phase="steering")
+
+    def _note_salvaged(self, count: int, turn_no: int) -> None:
+        """捞回来的调用要留痕：它没走服务端的 tool-call parser，读日志的人得知道这件事。"""
+        text = f"{count} 个工具调用是从正文里捞回来的（服务端没配对应的 tool-call parser）"
+        self.session.append("note", data={"phase": "tool_salvage", "count": count, "text": text, "level": "warn"})
+        self._publish(EventKind.WARNING, text, phase="assistant", turn=turn_no)
 
     def _record_tool_calls(self, turn: Turn) -> None:
         data: dict[str, Any] = {

@@ -169,7 +169,7 @@ sparkjury/
 │   │   ├── dgx.py                #   nvidia-smi 采样
 │   │   └── static/index.html     #   Cockpit 单页前端
 │   ├── agent/                    # M13  模型自己读技能、自己调工具的那一层
-│   │   ├── ai.py                 #   统一模型入口（四个本地端点 + 云端）
+│   │   ├── ai.py                 #   统一模型入口（四个本地端点 + 云端 + 工具调用兜底）
 │   │   ├── tools.py              #   工具注册表：技能按需加载与执行
 │   │   ├── loop.py               #   agent loop（steering / follow-up / abort）
 │   │   ├── session.py            #   会话树：只追加、带 parent 指针
@@ -244,7 +244,7 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 | M10 | DGX 部署 + τ²-bench 跑数 + 演示数据 | P0 | 脚本与 token 已完成，18 个用例；节点上执行待做 |
 | M11 | README / 征文 / 视频脚本 | P0 | 初稿已完成，2 个用例；截图、真实数字、录制待补 |
 | M12 | 跨平台与仓库约定守卫 | P1 | 已完成，17 个用例 |
-| M13 | Agent harness（模型自己调技能 + 可恢复 + 接口与权限） | P1 | 已完成，117 个用例 |
+| M13 | Agent harness（模型自己调技能 + 可恢复 + 接口与权限） | P1 | 已完成，132 个用例 |
 
 「N 个用例」指该模块测试文件被收集到的用例数（不是通过数），有跳过的在括号里注明。
 这张表由 `scripts/certificate.py` 逐行核对，改测试不改表会红。
@@ -463,7 +463,7 @@ M13 补这一层，参照 pi（earendil-works/pi）的 harness 分层，只做�
 
 | 层 | 文件 | 管什么 |
 |---|---|---|
-| 模型 | `agent/ai.py` | 四个本地端点 + 云端共用一个 `complete()`；换模型只换 `--model` |
+| 模型 | `agent/ai.py` | 四个本地端点 + 云端共用一个 `complete()`；换模型只换 `--model`；端点没解析出来的工具调用从正文里兜底捞回，并记进 manifest |
 | 工具 | `agent/tools.py` | 工具注册表；六个技能按需加载（`load_skill`）与执行（`run_skill`），加三个只读文件工具 |
 | 循环 | `agent/loop.py` | 消息 → 模型 → 工具 → 结果；steering / follow-up / abort 三个打断口 |
 | 会话 | `agent/session.py` | 只追加的 `session.jsonl`，每条带 parent 指针，可分支、可回放 |
@@ -506,7 +506,7 @@ durable 那一段：
 
 ## 17. 当前进度与验证方法
 
-M1 到 M13 已完成（M10 节点执行、M11 录制待做），257 个 pytest 用例通过。一条命令跑通全流程：
+M1 到 M13 已完成（M10 节点执行、M11 录制待做），272 个 pytest 用例通过。一条命令跑通全流程：
 
 ```
 cd sparkjury
