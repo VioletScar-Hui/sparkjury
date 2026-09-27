@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "action_key": "thaw:evt-0006:draft",
+      "action": "thaw",
+      "ts": "2026-09-27T19:24:41+08:00",
+      "version": "0.1.0",
+      "state": "DRAFT",
+      "frozen_hash": null,
+      "change_summary": "执行 PM 已批准的 v0.2（evt-0002/3/4，thaw 留据 evt-0005）",
+      "decision_event_id": "evt-0006",
+      "actor": "万凌"
+    },
+    {
+      "action_key": "freeze:86325dc19c927aea:0.2.0",
+      "action": "freeze",
+      "ts": "2026-09-27T19:27:04+08:00",
+      "version": "0.2.0",
+      "state": "FROZEN",
+      "frozen_hash": "86325dc19c927aea89593cd03ed6df08b26ad21a28122a8e466544091244d0dd",
+      "change_summary": "同上（批准链 evt-0002/3/4，thaw 留据 evt-0005/6）",
+      "decision_event_id": "evt-0002",
+      "actor": "万凌"
+    }
+  ],
+  "pack_id": "retail-default",
+  "current_version": "0.1.0",
+  "current_state": "DRAFT",
+  "frozen_hash": null
+}

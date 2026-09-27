@@ -1,43 +1,60 @@
-# judges.yaml — 裁判配置（scenario pack 策略数据）
-# 红线 1：被评 agent 模型不得与任一裁判同族（JudgeBench：同族自评准确率 64%→45%）。
-# 红线 2：仲裁方可降级，降级必须进 run manifest 的 degraded_flags。
+# judges.yaml — 裁判配置 v0.2（scenario pack 策略数据）
+# v0.2 变更（档一事实对齐 D1，2026-09-27）：judge_b Gemma→Nemotron（节点实测 504 票的
+# 真实面板）、judge_c 明确走 StepFun 云 API（比赛要求的家族位）。
+# 红线 1：被评 agent 不得与任一裁判同族（JudgeBench：同族自评 64%→45%）。
+# 红线 2：一切降级必须落 manifest 的 degradations（结构体，含 stage/component/reason/fallback）。
 
 meta:
-  version: 0.1.0
-  panel_principle: "跨模型族。同名族=同票数坍缩（Nine Judges: 有效独立票约2票）"
+  version: 0.2.0
+  panel_principle: "跨模型族。同族=票数坍缩（Nine Judges：九前沿 judge 有效独立票约 2）"
+  deployment_source: "deploy/judges.example.toml + 节点 2026-09-27 实测（avg 14.2s/11.3s，0 解析错误）"
 
 judges:
   - id: judge_a
     family: qwen
-    model: "Qwen3-30B-A3B"
-    runtime: "local_vllm"        # DGX Spark，vLLM 指本地端点
-    quant: "int4"
-    role: "主力裁判 + 仲裁降级兜底"
-  - id: judge_b
-    family: gemma
-    model: "Gemma-4-12B"
+    model: "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8"
     runtime: "local_vllm"
-    quant: "bf16"
-    role: "独立裁判"
+    endpoint: "http://127.0.0.1:8001/v1"
+    role: "主力裁判 + Jev 不可达时的本地仲裁者"
+    note: "extra_body 必须带 chat_template_kwargs.enable_thinking=false，否则思考文本淹没 JSON"
+  - id: judge_b
+    family: nvidia
+    model: "nvidia/Nemotron-3.5-Lightning-30B-A3B-NVFP4"
+    runtime: "local_vllm"
+    endpoint: "http://127.0.0.1:8002/v1"
+    role: "独立裁判（第二家族）"
+    note: "同上，Nemotron 否则纯文本推理永远到不了 JSON"
   - id: judge_c
     family: step
-    model: "Step-3.7-Flash"
-    runtime: "local_vllm"        # 显存不足时 runtime 切 stepfun_api，manifest 标 judge_c_api_fallback
-    quant: "auto"
-    role: "独立裁判（赛事要求 StepFun 模型在场，此位置必须存在）"
+    model: "step-3.7-flash"
+    runtime: "stepfun_api"
+    endpoint: "https://api.stepfun.com/v1"
+    api_key_env: "STEPFUN_API_KEY"
+    role: "独立裁判（第三家族，赛事要求 StepFun 在场）；key 无效/不可达 → mock 降级并落 degradations"
 
 embedding:
-  model: "local_embedding"       # 本地 embedding，具体模型名在部署态 pin
-  runtime: "local"
+  model: "Qwen/Qwen3-Embedding-0.6B"
+  runtime: "local_vllm"
+  endpoint: "http://127.0.0.1:8003/v1"
+  fallback: "hashing-512（零依赖哈希向量，降级如实标注 embedder 字段）"
 
 arbiter:
   primary:
     type: jev
-    endpoint: "api.typesafe.ai/v1/systemone"   # 云 API；不开源无权重，装不进 DGX
-    cost_note: "$0.04/百万输入 token，输出免费"
+    model: "jev-latest"
+    endpoint: "https://api.typesafe.ai/v1/systemone"
+    api_key_env: "TYPESAFE_API_KEY"
+    cost_note: "$0.042/百万输入 token，输出免费；P50 154-230ms（OpenRouter 第三方实测）"
+    usage_discipline:
+      - "每个 Choice 必须含『以上都不对』逃生选项（外部实测：无出口时以 80%+ 置信押错）"
+      - "只喂分歧点摘录不喂整条 trace（state engineering）；四维拆小判断并行"
+      - "置信度=选项间相对偏好≠正确率，任何呈现处必须带此标注"
+      - "算术类判断留在代码里，不进 Jev"
+      - "中文明显弱于英文——中文证据摘录先在自有轨迹上实测再启用"
   fallback:
     type: judge_a
-    degraded_flag: "jev_unreachable"
+    degradation: "{stage: ARBITRATE, component: jev, fallback: local judge arbitration}"
 
-lead_judge_selection: "由 calibrate 产出的裁判可靠性画像决定，不写死"
-judged_agent_forbidden_families: ["qwen", "gemma", "step"]   # 被评 agent 默认 demo 选型须避开
+lead_judge_selection: "由 calibrate 画像决定，不写死"
+judged_agent_forbidden_families: ["qwen", "nvidia", "step"]
+judged_agent_note: "当前被评 agent Qwen/Qwen3-8B 与 judge_a 同族（不同权重），README 已如实声明；理想应换第四家族"

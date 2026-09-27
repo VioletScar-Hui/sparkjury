@@ -279,10 +279,16 @@ def thin_candidates(runs_dir, pack_dir) -> dict:
     pack = _P(pack_dir)
     defined, fix_keys = set(), set()
     tax = pack / "taxonomy.yaml"
+    label_to_id = {}
     if tax.exists():
         for c in load_yaml_file(tax).get("categories") or []:
             if isinstance(c, dict) and c.get("id"):
                 defined.add(str(c["id"]))
+                if c.get("runtime_label"):
+                    label_to_id[str(c["runtime_label"])] = str(c["id"])
+    # pack v0.2 起 taxonomy 自带 runtime_label：观测到的运行时标签翻译成规范 id 再比对，
+    # namespace_mismatch 防线只在真正没有映射时触发
+    observed = {label_to_id.get(l, l) for l in observed}
     thr = pack / "thresholds.yaml"
     if thr.exists():
         pri = (load_yaml_file(thr).get("prioritize") or {})

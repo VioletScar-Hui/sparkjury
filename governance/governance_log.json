@@ -1,0 +1,16 @@
+[
+  {
+    "action_key": "thaw:evt-0006:draft",
+    "ts": "2026-09-27T19:24:41+08:00",
+    "action": "thaw",
+    "event_id": "evt-0006",
+    "detail": "已退回 DRAFT（内容 hash=6ecbd6676c3bafd1）。回 DRAFT 后不得用于回归对比。"
+  },
+  {
+    "action_key": "freeze:86325dc19c927aea:0.2.0",
+    "ts": "2026-09-27T19:27:04+08:00",
+    "action": "freeze",
+    "event_id": "evt-0008",
+    "detail": "FROZEN pack=retail-default v0.2.0 hash=86325dc19c927aea89593cd03ed6df08b26ad21a28122a8e466544091244d0dd"
+  }
+]

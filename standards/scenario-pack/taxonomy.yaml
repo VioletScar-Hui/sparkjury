@@ -1,104 +1,84 @@
-# taxonomy.yaml — 失败分类体系（scenario pack 策略数据）
-# v0.1 为工作草案，融合 MAST(arXiv 2503.13657)与 TRAIL(arXiv 2505.08638)的失败模式思路。
-# master_trail_mapping 字段待校准后回填；万凌的「六节点」可映射到 category_to_node。
-# cluster/prioritize/report 只消费本文件的 id，不许在各 skill 内自造分类。
+# taxonomy.yaml — 失败分类体系 v0.2（scenario pack 策略数据）
+# v0.2 变更（PM 批准 evt-0002，2026-09-27）：pack 迁就运行时 FailureLabel——
+# 类目收敛为运行时 9 个标签 + F99 人工队列；F-id 保留为规范 id（黄金池事件、
+# fixability 键、govern 投影的 F\d\d 约定全部继续有效），新增 runtime_label
+# 字段承载与 src/sparkjury/models/cluster.py FailureLabel 的 1:1 映射。
+# 消费方（prioritize/thin_candidates）凭 runtime_label 自动翻译，
+# 不再需要手工映射表。cluster/report 只消费本文件的 id 与 runtime_label。
 
 meta:
-  version: 0.1.0
+  version: 0.2.0
   owner: "万凌"
-  status: "draft — 需在一轮真实 trace 上冒烟后冻结"
+  status: "active — 与运行时 FailureLabel 对齐（源：MAST/TRAIL 收敛版）"
+  runtime_source: "src/sparkjury/models/cluster.py::FailureLabel"
 
 categories:
   - id: F01
+    runtime_label: wrong_tool
     name: 工具选择错误
-    definition: "用了不该用的工具，或该用的工具没用"
-    typical_dimension: process
+    definition: "意图对，但选了不该用的工具"
     default_severity: 2
     example: "改地址时误调了取消订单接口"
 
   - id: F02
+    runtime_label: wrong_args
     name: 工具参数错误
-    definition: "工具选对但参数取值与任务事实不符"
-    typical_dimension: process
+    definition: "工具选对，参数错误或缺失"
     default_severity: 2
-    example: "把新地址写进了旧的地址字段 / order_id 串号"
+    example: "order_id 串号 / 新地址写进旧字段"
 
   - id: F03
-    name: 调用顺序错误
-    definition: "破坏依赖关系的调用顺序（先写后查、未验证先提交）"
-    typical_dimension: process
+    runtime_label: missing_lookup
+    name: 未查先动
+    definition: "没有读取记录就行动或作答"
     default_severity: 2
     example: "未查库存直接创建退货单"
 
-  - id: F04
-    name: 遗漏必要动作
-    definition: "instruction 的显式子目标没有对应动作"
-    typical_dimension: process
-    default_severity: 3
-    example: "用户要求改地址+通知物流，只改了地址"
-
-  - id: F05
-    name: 多余动作
-    definition: "执行了与任务无关的工具调用"
-    typical_dimension: efficiency
-    default_severity: 1
-    example: "查订单历史时顺手导出了全表"
-
   - id: F06
-    name: 冗余与空转
-    definition: "重复调用、无修正的原样重试、无效等待"
-    typical_dimension: efficiency
-    default_severity: 1
-    example: "同一查询连续失败三次、参数一字未改"
+    runtime_label: loop
+    name: 循环空转
+    definition: "重复同一动作，永不收敛"
+    default_severity: 2
+    example: "同一调用失败后原样重试直至耗尽轮次（2026-09-27 真实基线主导失败，53%）"
 
   - id: F07
-    name: 未验证结果
-    definition: "写操作后无回查确认即宣告完成"
-    typical_dimension: process
-    default_severity: 2
-    example: "修改地址后未回读，实际写入失败"
+    runtime_label: missing_confirmation
+    name: 缺确认的破坏性操作
+    definition: "破坏性动作没有拿到用户明确同意"
+    default_severity: 3
+    example: "未经二次确认直接取消订单"
 
   - id: F08
-    name: 危险动作
-    definition: "越权、不可逆无确认、PII 外泄"
-    typical_dimension: risk
+    runtime_label: unauthenticated_action
+    name: 未验身份即操作
+    definition: "验证用户身份之前就执行了动作"
     default_severity: 3
-    example: "未经二次确认直接退款"
-
-  - id: F09
-    name: 上下文丢失
-    definition: "多轮对话中丢失已确认事实，反复索要或答非所问"
-    typical_dimension: process
-    default_severity: 2
-    example: "第二轮忘记用户已经提供的订单号"
+    example: "没有 find_user_id_* 就执行写操作"
 
   - id: F10
-    name: 事实性错误
-    definition: "回复内容与工具返回/系统事实矛盾"
-    typical_dimension: outcome
+    runtime_label: hallucinated_info
+    name: 虚构事实
+    definition: "陈述了没有任何工具结果支撑的事实"
     default_severity: 2
-    example: "工具返回退款失败，agent 回复已退款成功"
+    example: "工具返回退款失败，回复却说已退款成功"
 
   - id: F11
-    name: 目标偏离
-    definition: "完成了动作但解决的不是用户要求的问题"
-    typical_dimension: outcome
+    runtime_label: policy_violation
+    name: 违反业务规则
+    definition: "破坏了领域策略（退款上限、交换规则等）"
     default_severity: 3
-    example: "用户要取消订单，agent 反复解释取消政策"
+    example: "超出退款额度仍执行退款"
 
   - id: F12
-    name: 执行中断
-    definition: "未完成即放弃/超时后无恢复策略/无限循环"
-    typical_dimension: outcome
+    runtime_label: premature_stop
+    name: 提前放弃
+    definition: "目标未达成即结束"
     default_severity: 2
     example: "第三次工具超时后直接结束会话"
 
   - id: F99
+    runtime_label: other
     name: 未分类
-    definition: "聚类后无法落入以上类目，进入待分类队列由人裁决"
-    typical_dimension: any
+    definition: "无法落入以上类目，进入人工裁决队列（永不进 Thin 候选、永不自动贴标签）"
     default_severity: 1
     example: ""
-
-master_trail_mapping: {}      # TODO: 与 MAST 11 类、TRAIL 维度对齐后回填
-category_to_node: {}          # TODO(万凌): 六节点分类器节点映射后回填

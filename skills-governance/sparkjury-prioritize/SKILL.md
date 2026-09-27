@@ -38,7 +38,12 @@ allowed-tools: Read Bash Write
 **不用于**：定位根因（cluster 已划边界）、估算具体工时、做技术方案选型、
 比较两轮回归（那是 `regress`）。
 
-> **v0.1 生产者缺位声明**：本 skill 期望的 `clusters[]`（F 编号标签 + `severity_max` 序数 +
+> **v0.2 起运行时产物可直接消费**：pack taxonomy 自带 runtime_label 映射（PM 批准
+> evt-0002），`--pack` 给定时 loop/wrong_tool 等运行时标签自动翻译为 F-id、severity
+> 浮点自动落 taxonomy default 并留痕（meta.label_translations）——不再需要手工映射表。
+> 温度档位同时改从 pack thresholds.prioritize.focus 读（meta.temperature.profile_source）。
+
+> **v0.1 生产者缺位声明（历史）**：本 skill 期望的 `clusters[]`（F 编号标签 + `severity_max` 序数 +
 > `trace_ids`）与 sparkjury 运行时产物（`FailureLabel` 文本标签 + `severity` 浮点 +
 > `member_trace_ids`）形状不同。直接喂 `sparkjury cluster` 产物会**全量拒排**（fail-safe，
 > 每条带 reason，见 BENCHMARK 真实产物三步）；映射表见 BENCHMARK，正式对齐走 pack v0.2（D3）。

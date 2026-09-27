@@ -77,6 +77,46 @@ def resolve_total_badcases(clusters_path: Path, clusters: list, explicit: int | 
     return sum(c.get("size") or 0 for c in clusters), "sum_of_cluster_sizes"
 
 
+def translate_runtime_labels(clusters: list, pack_dir) -> tuple:
+    """pack v0.2：taxonomy 自带 runtime_label 映射，运行时产物（label=loop 等）可直接
+    消费，不再需要手工映射表。翻译规则：
+      - label 命中某类的 runtime_label → 换成规范 id（Fxx），记 translation
+      - severity_max 缺失或不在 {1,2,3} → 用该类 default_severity，记 severity_source
+      - 翻译不到的保持原样（后续拒排路径自然带 reason，不静默）
+    pack 无 taxonomy 或无 runtime_label 字段时原样返回（v0.1 pack 兼容）。"""
+    if not pack_dir:
+        return clusters, []
+    tax = Path(pack_dir) / "taxonomy.yaml"
+    if not tax.exists():
+        return clusters, []
+    from ranking import load_thresholds as _load_yaml  # 同一权威 YAML 实现
+    mapping = {}
+    for c in (_load_yaml(tax).get("categories") or []):
+        if isinstance(c, dict) and c.get("runtime_label") and c.get("id"):
+            mapping[str(c["runtime_label"])] = (str(c["id"]), c.get("default_severity"))
+    if not mapping:
+        return clusters, []
+    out, notes = [], []
+    for cl in clusters:
+        cl = dict(cl)
+        lab = str(cl.get("label"))
+        if lab in mapping:
+            fid, dsev = mapping[lab]
+            note = {"from": lab, "to": fid}
+            cl["label"] = fid
+            cl.setdefault("category_name", lab)
+            if cl.get("severity_max") not in (1, 2, 3) and dsev in (1, 2, 3):
+                note["severity_source"] = f"taxonomy_default({dsev})，原值 {cl.get('severity_max')!r} 非序数"
+                cl["severity_max"] = dsev
+            if "share" not in cl and isinstance(cl.get("size"), int):
+                note["share_source"] = "由调用方分母推导"
+            if "trace_ids" not in cl and cl.get("member_trace_ids"):
+                cl["trace_ids"] = cl["member_trace_ids"]   # 运行时字段名（D 差异第 6 条）
+            notes.append(note)
+        out.append(cl)
+    return out, notes
+
+
 def run(clusters_path: Path, thresholds_path: Path, out_dir: Path, run_id: str,
         pack_hash: str | None, ledger: str | None, overrides_path: Path | None,
         total_badcases: int | None = None, pack_dir: Path | None = None,
@@ -88,6 +128,7 @@ def run(clusters_path: Path, thresholds_path: Path, out_dir: Path, run_id: str,
     if not isinstance(clusters, list):
         raise ValueError(f"{clusters_path}: 期望 clusters 数组或含 clusters 键的对象")
     overrides = load_overrides(overrides_path) if overrides_path else []
+    clusters, label_translations = translate_runtime_labels(clusters, pack_dir)
     run_id = run_id or f"run-{sha256_obj([c.get('cluster_id') for c in clusters])[:12]}"
 
     total, total_src = resolve_total_badcases(clusters_path, clusters, total_badcases)
@@ -101,7 +142,8 @@ def run(clusters_path: Path, thresholds_path: Path, out_dir: Path, run_id: str,
     result = rank(clusters, thresholds, overrides, total)
     # 呈现层温度（万凌 2026-09-27 产品定义）：None=关，输出与旧版逐字节一致
     decided = decided_categories(overrides_path) if (overrides_path and temperature is not None) else set()
-    result = apply_temperature(result, temperature, decided)
+    pack_profiles = ((thresholds.get("prioritize") or {}).get("focus")) or None
+    result = apply_temperature(result, temperature, decided, pack_profiles)
 
     out = {
         "ranked": result["ranked"],
@@ -116,6 +158,7 @@ def run(clusters_path: Path, thresholds_path: Path, out_dir: Path, run_id: str,
             # 恒存在（无 override 时为 []）：空数组 = 没有未生效的人工决策，
             # 缺这个键则下游无法区分"没有"和"没记"。
             "override_unmatched": result["override_unmatched"],
+            **({"label_translations": label_translations} if label_translations else {}),
             **({"temperature": result["temperature"]} if "temperature" in result else {}),
             "disclaimer": (
                 "fixability_boost 为 pack v0.1 人工先验（未经黄金池校准）；"

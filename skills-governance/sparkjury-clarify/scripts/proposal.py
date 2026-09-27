@@ -46,7 +46,7 @@ def build_questions(pack: dict) -> list:
         },
         {
             "id": "Q2",
-            "question": "四维（outcome/process/efficiency/risk）里哪几个更要紧？权重怎么摆？",
+            "question": "四维（以 pack rubrics 为准，当前 outcome/tool_use/efficiency/safety）里哪几个更要紧？权重怎么摆？",
             "maps_to": [f"{PACK_PREFIX}/rubrics.yaml:dimensions[].weight"],
             "default_if_unanswered": weight_default,
         },
@@ -63,7 +63,7 @@ def build_questions(pack: dict) -> list:
             "id": "Q4",
             "question": "什么动作算一票否决？（risk 维 hard_rules 的边界）",
             "maps_to": [
-                f"{PACK_PREFIX}/rubrics.yaml:dimensions[id=risk].hard_rules",
+                f"{PACK_PREFIX}/rubrics.yaml:dimensions[id=safety].hard_rules",
                 f"{PACK_PREFIX}/taxonomy.yaml:categories[id=F08].default_severity",
             ],
             "default_if_unanswered": "沿用 v0.1：越权 / PII 外泄 / 不可逆无确认",
@@ -134,7 +134,7 @@ def compile_proposal(answers: dict, pack: dict) -> tuple:
         pending.append("Q2 未答：四维权重沿用 pack 现值")
     elif k2 == "directional":
         flags.append("clarify_direction_only")
-        dims = a2.get("dims") or list(DIMENSIONS)
+        dims = a2.get("dims") or list(weights) or list(DIMENSIONS)
         for d in dims:
             if d not in weights:
                 pending.append(f"Q2 要求调整 {d}，但 pack 未扫描到该维权重")
@@ -146,12 +146,24 @@ def compile_proposal(answers: dict, pack: dict) -> tuple:
         pending.append("Q2 只给了方向：请给出四维显式权重（和须为 1.0）")
     else:
         new_w = a2.get("weights") or {}
-        total = round(sum(new_w.get(d, 0.0) for d in DIMENSIONS), 6)
-        if abs(total - 1.0) > 1e-6:
+        dims_order = list(weights) or list(DIMENSIONS)  # 维度名跟 pack，不跟常量
+        unknown = sorted(d for d in new_w if d not in weights) if weights else []
+        total = round(sum(new_w.get(d, 0.0) for d in dims_order), 6)
+        if unknown:
+            # pack 不认识的维度名不许静默忽略——忽略会让求和假装等于 1（v0.2 改名
+            # tool_use/safety 时老名字 process/risk 正是这样漏过求和检查再 KeyError 的）
+            flags.append("clarify_direction_only")
+            pending.append(f"Q2 含 pack 不认识的维度 {unknown}（pack 维度：{dims_order}），"
+                           "拒绝生成数值 diff，请按 pack 维度名重新给出")
+        elif abs(total - 1.0) > 1e-6:
             flags.append("clarify_direction_only")
             pending.append(f"Q2 权重和={total}≠1.0，拒绝据此生成数值 diff，请重新分配")
+        elif any(d not in new_w for d in dims_order):
+            missing = [d for d in dims_order if d not in new_w]
+            flags.append("clarify_direction_only")
+            pending.append(f"Q2 缺维度 {missing} 的权重，四维必须给全")
         else:
-            for d in DIMENSIONS:
+            for d in dims_order:
                 if d not in weights:
                     pending.append(f"Q2 给出 {d} 权重，但 pack 未扫描到该维 current 值，该条作废")
                     continue

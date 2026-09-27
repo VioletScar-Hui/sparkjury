@@ -36,15 +36,20 @@ def selftest(pack_dir: Path) -> int:
     check("五问预算：问题数 == 5", len(questions) == QUESTION_BUDGET, str(len(questions)))
     check("五问每条都有 maps_to", all(q.get("maps_to") for q in questions))
 
+    _pack_weights = dict(pack.get("weights") or {})
+    _last_dim = [d for d in _pack_weights if d != "outcome"][-1] if len(_pack_weights) > 1 else "outcome"
     answers = {
         "Q1": {"kind": "explicit", "text": "客服退款 agent，retail 域"},
-        "Q2": {"kind": "explicit", "weights": {"outcome": 0.30, "process": 0.30,
-                                               "efficiency": 0.15, "risk": 0.25}},
+        # 维度名从真实 pack 动态取（v0.2 改名 tool_use/safety 时这里曾因写死 "risk" 假红）：
+        # 断言对象是"权重 diff 生成机制"，不是维度叫什么。
+        "Q2": {"kind": "explicit", "weights": {d: (0.25 if d == _last_dim else
+                                                   (0.30 if d == "outcome" else w))
+                                               for d, w in _pack_weights.items()}},
         "Q3": {"kind": "explicit", "text": "终态有 DB diff 可以判"},
         "Q4": {"kind": "skipped"},
         "Q5": {"kind": "explicit", "value": 3},
     }
-    session = run_session("clarify selftest：风险比效率重要，risk 提到 0.25，从 outcome 扣",
+    session = run_session(f"clarify selftest：{_last_dim} 提到 0.25，从 outcome 扣",
                           answers, pack, prior_answered=("Q1", "Q5"))
 
     check("questions_asked ≤ 预算", len(session["questions_asked"]) <= QUESTION_BUDGET,
@@ -53,14 +58,14 @@ def selftest(pack_dir: Path) -> int:
           all(q["id"] not in ("Q1", "Q5") for q in session["questions_asked"]))
     check("status=pending_approval", session["proposal"]["status"] == "pending_approval")
     diff = session["proposal"]["pack_diff"]
-    check("显式权重产出 2 条数值 diff（outcome/risk）", len(diff) == 2,
+    check("显式权重产出 2 条数值 diff（outcome+动态维）", len(diff) == 2,
           json.dumps([f"{e['field']}={e['current']}->{e['proposed']}" for e in diff], ensure_ascii=False))
     check("每条 diff 都有非空 impact",
           all(e["impact"]["affected_skills"] and e["impact"]["affected_dimensions"] for e in diff))
     check("current 值来自 pack 而非 None",
           all(e["current"] is not None for e in diff))
     check("风险维 proposes 0.25",
-          any(e["field"].endswith("[id=risk].weight") and e["proposed"] == 0.25 for e in diff))
+          any(e["field"].endswith(f"[id={_last_dim}].weight") and e["proposed"] == 0.25 for e in diff))
     check("pass_k 一致 -> 不制造无意义 diff",
           not any("pass_k" in e["field"] for e in diff))
     check("未答的 Q4 进 pending_items",

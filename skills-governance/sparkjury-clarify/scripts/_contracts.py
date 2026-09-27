@@ -20,7 +20,9 @@ QUESTION_BUDGET = 5
 # 引用黄金池统计信号所需的最小决策条数
 MIN_SUPPORT = 3
 
-DIMENSIONS = ("outcome", "process", "efficiency", "risk")
+# 兜底维度表（pack 扫描不到权重时才用）。维度名以 pack rubrics 为唯一真相源——
+# v0.2 已改名 tool_use/safety，写死名单曾让权重求和漏项、把合法输入误判为"和≠1"。
+DIMENSIONS = ("outcome", "tool_use", "efficiency", "safety")
 
 # pack 在 sparkjury 仓库内的相对路径前缀（eval-agent 原态在根 scenario-pack/）。
 # maps_to / pack_diff.target_file 一律由它构造 —— 提案指向的路径必须在本仓库里真实存在，

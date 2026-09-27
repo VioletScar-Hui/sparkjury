@@ -32,15 +32,28 @@ PROFILES = [
 TODO_PACK = "focus 档位映射为 v0.1 技能层常量，待 pack v0.2 收编（thresholds.prioritize.focus）"
 
 
-def profile_of(temperature: float) -> tuple[str, int, float | None, int | None]:
+def profile_of(temperature: float, pack_profiles: list | None = None):
+    """档位判定。pack v0.2 起映射收编进 thresholds.prioritize.focus（PM 批准链 evt-0002），
+    传入 pack_profiles 时以 pack 为准；缺失时退回内置表（v0.1 兼容）并沿用其语义。"""
     t = min(max(float(temperature), 0.0), 1.0)
+    if pack_profiles:
+        for prof in pack_profiles:
+            if t < float(prof.get("max_t", 1.01)):
+                cap = prof.get("queue_cap")
+                share = prof.get("min_share")
+                return (str(prof.get("name", "?")), int(prof.get("min_severity", 0)),
+                        float(share) if share is not None else None,
+                        int(cap) if cap is not None else None)
+        last = pack_profiles[-1]
+        return (str(last.get("name", "full")), int(last.get("min_severity", 0)), None, None)
     for upper, name, min_sev, min_share, cap in PROFILES:
         if t < upper:
             return name, min_sev, min_share, cap
     return "full", 0, None, None  # pragma: no cover — 1.01 上界已兜住
 
 
-def apply_temperature(result: dict, temperature: float | None, decided: set | None = None) -> dict:
+def apply_temperature(result: dict, temperature: float | None, decided: set | None = None,
+                      pack_profiles: list | None = None) -> dict:
     """rank() 之后调用。温度为 None 时原样返回（不加任何字段，保证旧输出逐字节不变）。
 
     返回的 result 中：ranked 只剩浮出的类（rank 重编号），top_recommendation 从浮出集
@@ -48,7 +61,7 @@ def apply_temperature(result: dict, temperature: float | None, decided: set | No
     """
     if temperature is None:
         return result
-    name, min_sev, min_share, cap = profile_of(temperature)
+    name, min_sev, min_share, cap = profile_of(temperature, pack_profiles)
     # 钉住集 = 本轮 override 生效的类 ∪ ledger 里任意人类决策触碰过的类（decided）。
     # 后者是外部情报 W3 的落地：不可逆决策（如 reject_proposal「本轮不修」）绝不被
     # 高温度档静默吞掉——人看过的东西只能由人再收起来。
@@ -109,6 +122,6 @@ def apply_temperature(result: dict, temperature: float | None, decided: set | No
         "suppressed": suppressed,   # 逐条带 reason：抑制不是删除
         "pinned_by_override": sorted(pinned & {r.get("category_id") for r in surfaced}),
         "note": note,
-        "todo": TODO_PACK,
+        "profile_source": "pack" if pack_profiles else "builtin_v0.1",
     }
     return result
