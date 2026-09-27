@@ -388,8 +388,8 @@ def regress(
     out: Path | None = typer.Option(None, "--out", help="write the markdown report here"),
     pairwise: str | None = typer.Option(None, "--pairwise", help="'mock' or a panel TOML; judges before/after pairs with order swap"),
     as_json: bool = typer.Option(False, "--json"),
-    gates: bool = typer.Option(True, "--gates/--no-gates", help="回归门禁：同 pack 铁律 + Δpass^k 阈值 + 新高严重簇阻断"),
-    delta_min: float = typer.Option(0.02, "--delta-min", help="主指标最小提升（治理来源：pack thresholds.regress）"),
+    gates: bool = typer.Option(True, "--gates/--no-gates", help="regression gates: same pack hash, min pass^k delta, no new severe cluster"),
+    delta_min: float = typer.Option(0.02, "--delta-min", help="min pass^k improvement to PASS (governed by pack thresholds.regress)"),
 ) -> None:
     """Compare two evaluation stores (M6): pass^k before/after, tasks fixed or broken, cluster shifts."""
     from sparkjury.regress import compare, render_markdown
