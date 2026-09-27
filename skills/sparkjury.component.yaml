@@ -14,4 +14,9 @@ skills:
   - sparkjury-cluster
   - sparkjury-report
   - sparkjury-regress
+  - sparkjury-arbitrate
+  - sparkjury-calibrate
+  - sparkjury-prioritize
+  - sparkjury-clarify
+  - sparkjury-govern
 tags: [evaluation, agents, dgx-spark, llm-as-judge, tau2-bench, opentelemetry]

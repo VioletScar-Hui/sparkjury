@@ -13,7 +13,9 @@ SKILLS = ROOT / "skills"
 sys.path.insert(0, str(ROOT / "scripts"))
 from validate_skills import parse_frontmatter, validate_skill  # noqa: E402
 
-EXPECTED = ["sparkjury-clean", "sparkjury-evalset", "sparkjury-score", "sparkjury-cluster", "sparkjury-report", "sparkjury-regress"]
+EXPECTED = ["sparkjury-clean", "sparkjury-evalset", "sparkjury-score", "sparkjury-cluster",
+            "sparkjury-report", "sparkjury-regress", "sparkjury-arbitrate", "sparkjury-calibrate",
+            "sparkjury-prioritize", "sparkjury-clarify", "sparkjury-govern"]
 
 
 # ---- skills -------------------------------------------------------------------------
@@ -49,7 +51,7 @@ def test_validator_catches_bad_skill(tmp_path):
 def test_validate_script_runs():
     r = subprocess.run([sys.executable, str(ROOT / "scripts" / "validate_skills.py"), str(SKILLS)], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "6/6 skills valid" in r.stdout
+    assert f"{len(EXPECTED)}/{len(EXPECTED)} skills valid" in r.stdout
 
 
 @pytest.mark.parametrize("name", EXPECTED)

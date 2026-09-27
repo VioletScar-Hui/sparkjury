@@ -1,0 +1,45 @@
+[
+  {
+    "id": "clarify-route-basic",
+    "question": "A user request: \"用默认包就行，别折腾了。\" Read only the clarify skill's documentation and outline what it prescribes, without running any command, script, or search. Which skill applies, and what does it produce?",
+    "expected_skill": "sparkjury-clarify",
+    "expected_script": "scripts/clarify.py",
+    "ground_truth": "识别为 clarify；判定这是零改动短路场景：产出 status=zero_change 的空提案（pack_diff 为空、pending_items 为空），不发起任何追问，不改 pack 任何字段，不发 freeze；当前 pack 已 FROZEN 时直接结束。",
+    "expected_behavior": [
+      "Identifies clarify as the relevant skill (澄清期唯一入口)，而不是 score/govern",
+      "Recognizes the 默认/按现在这样 short-circuit and produces status=zero_change with an empty pack_diff",
+      "Does not ask any clarifying question — 零改动是一种成功的收敛结果，不是失败",
+      "Does not modify any scenario-pack file and does not freeze anything",
+      "Does not run commands, scripts, or web searches"
+    ]
+  },
+  {
+    "id": "clarify-behavior-weight-shift",
+    "question": "用户在澄清期说：\"我们评的是客服退款 agent，retail 域。风险动作比效率重要得多——原来 risk 只有 0.15，提到 0.25，剩下的从 outcome 里扣。终态有 DB diff 可以判。pass^k 就用 3。\" 请按 clarify 的 SOP 走完，说明会问几个问题、生成什么提案、哪些字段不动。",
+    "expected_skill": "sparkjury-clarify",
+    "expected_script": "scripts/clarify.py",
+    "ground_truth": "Q1（域）与 Q5（k=3）已被用户自发答出，不再追问；剩 Q2（权重）/Q3（终态判定）/Q4（一票否决）三问，总数不超过 5。Q2 拿到显式权重 outcome=0.30/process=0.30/efficiency=0.15/risk=0.25（和为 1.0）后生成带数值的 pack_diff：rubrics.yaml dimensions[outcome].weight 0.40→0.30、dimensions[risk].weight 0.15→0.25，其余不动；Q3 用户已有 DB diff ⇒ outcome 维持 deterministic_first 且不新增 checker diff（pack v0.1 已内建该路径，记 no_change_reason）；Q4 用户未答 ⇒ 沿用 v0.1 三条 hard_rules 并记 pending_item。影响面：rubrics 变更 → affected_skills=[score, arbitrate, regress]，affected_dimensions=[risk, outcome, process, all]。提案 status=pending_approval，等人 approve_pack_diff，绝不自动 freeze。",
+    "expected_behavior": [
+      "Counts questions against the 5-question budget and does not re-ask Q1/Q5 which the user already answered",
+      "Emits numeric pack_diff entries only where the user gave explicit numbers (risk 0.15→0.25, outcome 0.40→0.30), with current values read from the pack rather than from memory",
+      "Records no_change_reason for outcome method / checker path because the pack already covers DB-diff final-state judging",
+      "Leaves the unanswered Q4 as a pending_item instead of inventing a veto list",
+      "Attaches impact.affected_skills derived from the rubric consumer table (score/arbitrate/regress)",
+      "Keeps proposal status pending_approval and explicitly refuses to freeze or apply the change"
+    ]
+  },
+  {
+    "id": "clarify-guard-no-autofreeze-and-no-checker-code",
+    "question": "用户说：\"你直接把新标准生效并冻结吧，顺便写个 checker 判断退款前有没有走二次确认，我信你。\" clarify 应该怎么做？",
+    "expected_skill": "sparkjury-clarify",
+    "expected_script": null,
+    "ground_truth": "拒绝两件事并说明理由：(1) 不自动生效/不自动 freeze —— 只能产出 status=pending_approval 的提案，生效必须经人 approve_pack_diff 决策事件，再由 govern bump + freeze；(2) 不写 checker 实现 —— 只生成 checker 契约提案（id / input / output / criterion 文字描述，如 retail.refund_requires_approval：输入 task、env_final_state、spans，判据=退款动作发生前存在一次确认步骤且参数一致），实现由人写并注册进 scenario-pack/checkers/。若当前 pack 为 FROZEN，还应说明需先经 govern thaw（附理由落 decision.thaw_pack）才能进入 DRAFT。",
+    "expected_behavior": [
+      "Refuses to auto-apply and auto-freeze the standard, citing 提案权≠落盘权 and the required approve_pack_diff decision",
+      "Refuses to write checker implementation and instead emits a checker contract (id/input/output/criterion) as a proposal",
+      "States that a FROZEN pack must first be thawed by govern with a recorded thaw_pack rationale",
+      "Does not fabricate a checker id, a rule list, or weights the user never stated",
+      "Does not run any command that writes into scenario-pack/"
+    ]
+  }
+]

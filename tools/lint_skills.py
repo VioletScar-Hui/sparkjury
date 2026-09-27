@@ -164,14 +164,24 @@ def main() -> int:
         print(f"repo checks: {'PASS' if not errs else str(len(errs)) + ' FAIL'}")
         return 1 if errs else 0
     base = Path(sys.argv[sys.argv.index("--skills-dir") + 1]) if "--skills-dir" in sys.argv else Path("skills")
+    only = None
+    if "--only" in sys.argv:
+        only = {s.strip() for s in sys.argv[sys.argv.index("--only") + 1].split(",") if s.strip()}
     if not base.is_dir():
         print(f"FATAL: {base} 不存在"); return 1
     # 兼容两种调用：指向单个 skill 目录（含 SKILL.md）或 skill 的父目录
     if (base / "SKILL.md").exists():
         skills = [base]
     else:
-        skills = sorted(d for d in base.iterdir() if d.is_dir() and not d.name.startswith(".") and (d / "SKILL.md").exists())
+        skills = sorted(d for d in base.iterdir()
+                        if d.is_dir() and not d.name.startswith(".") and (d / "SKILL.md").exists()
+                        and (only is None or d.name in only))
     total_fail = 0
+    if only is not None:
+        missing = only - {d.name for d in skills}
+        if missing:
+            print(f"FATAL: --only 指定了不存在的 skill: {sorted(missing)}")
+            return 1
     for d in skills:
         errs = lint_skill(d)
         status = "PASS" if not errs else "FAIL"

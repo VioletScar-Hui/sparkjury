@@ -1,6 +1,7 @@
 # SparkJury Agent Skills
 
-Six skills, one per evaluation stage, following the [Agent Skills specification](https://agentskills.io/specification)
+Eleven skills: six for the evaluation stages, five for scoring governance
+(arbitration protocol, judge calibration, prioritization, clarification and pack lifecycle). following the [Agent Skills specification](https://agentskills.io/specification)
 and the layout used by the [NVIDIA/skills](https://github.com/NVIDIA/skills) registry.
 
 | Skill | Wraps | Purpose |
@@ -11,11 +12,22 @@ and the layout used by the [NVIDIA/skills](https://github.com/NVIDIA/skills) reg
 | `sparkjury-cluster` | `sparkjury cluster` | badcase clusters, labels, priority |
 | `sparkjury-report` | `sparkjury report` | evidence card (json / md / html) |
 | `sparkjury-regress` | `sparkjury regress` | before / after comparison |
+| `sparkjury-arbitrate` | `sparkjury arbitrate` | disagreement arbitration protocol (Jev / local / degraded) |
+| `sparkjury-calibrate` | `tools/` 桥接脚本（v0.1） | judge reliability profile before scoring starts |
+| `sparkjury-prioritize` | `tools/` 桥接脚本（v0.1） | which failure class to fix first + golden-pool override hook |
+| `sparkjury-clarify` | `tools/` 桥接脚本（v0.1） | the only pack writer during the clarification stage |
+| `sparkjury-govern` | `tools/` 桥接脚本（v0.1） | pack freeze/thaw + decision ledger + golden-pool projections |
 
 Each directory contains:
 
 - `SKILL.md` — frontmatter (`name`, `description`, `license`, `compatibility`, `metadata`) + instructions
-- `skill-card.md` — governance metadata required by the NVIDIA registry (owner, risk, data handling, side effects)
+- `skill-card.md` — governance metadata: NVIDIA registry template (owner, risk, references, output) + `Data handling` and `Risk level` sections
+- `schemas/io.schema.json` — I/O contract for the stage's artifacts (JSON Schema)
+- `evals/evals.json` — 3 registry routing/behaviour/guard cases
+- `references/` — deep protocol notes loaded on demand
+- `BENCHMARK.md` — how to benchmark this skill and what counts as pass
+
+Structure gate: `python3 tools/lint_skills.py --skills-dir skills` (superset of `scripts/validate_skills.py`: adds schemas/evals/pyc checks).
 - `scripts/run.py` — thin wrapper around the CLI; extra arguments are passed through
 
 ## Install into an agent

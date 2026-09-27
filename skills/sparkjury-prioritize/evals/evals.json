@@ -1,0 +1,47 @@
+[
+  {
+    "id": "prioritize-route-basic",
+    "question": "A user request: \"Use the prioritize skill.\" Identify which skill applies and, reading only that skill's documentation, outline the steps it prescribes. Do NOT run any commands, scripts, web searches, or other tools — describe the plan only.",
+    "expected_skill": "sparkjury-prioritize",
+    "expected_script": "scripts/prioritize.py",
+    "ground_truth": "prioritize 把 cluster 产出的失败类排成'先修哪一类'的顺序。公式 = frequency_norm × severity_weight × fixability_boost，三个系数全部读 pack thresholds.prioritize，禁止自造。步骤 = 校验输入 → 定分母（显式入参 > 同目录 cluster_report.json 的 total_badcases > 累加）→ 逐类 compute_priority（缺系数进 rejected_candidates，不补默认）→ priority 降序排序并赋 rank → 应用 ledger 里 override_priority 的人工修正（只提升不压低，rationale 注明来源）→ 只取 top_recommendation_count 个（pack=1）→ 输出 ranked/top_recommendation/rejected_candidates/meta 并写 run-manifest。",
+    "expected_behavior": [
+      "Identifies prioritize as the relevant skill and states it sits after cluster in the fixed pipeline (…→cluster→prioritize→report→regress)",
+      "States the formula priority = frequency_norm × severity_weight × fixability_boost and that all coefficients come from the FROZEN pack's thresholds.prioritize, never invented locally",
+      "Outlines the documented steps: validate → resolve denominator → compute_priority per cluster → sort by priority desc with category_id ascending as tiebreak → apply override_priority from the ledger → emit only one top_recommendation",
+      "Names the outputs: ranked[] with rank/category_id/priority/frequency/severity/fixability/rationale, a single top_recommendation, and rejected_candidates for clusters missing coefficients",
+      "States that a missing coefficient sends the cluster to rejected_candidates rather than getting a default value, and that top_recommendation count is 1 because human attention is scarce",
+      "Does not run commands, scripts, or web searches"
+    ]
+  },
+  {
+    "id": "prioritize-behavior-missing-coefficient-and-denominator",
+    "question": "The clusters.json from upstream contains four clusters (F01, F02, F07, F04) plus an F99 cluster that somehow got included in the clusters array. The sibling cluster_report.json says total_badcases=60. Process this and explain what appears in the output and why.",
+    "expected_skill": "sparkjury-prioritize",
+    "expected_script": "scripts/prioritize.py",
+    "ground_truth": "Denominator must be 60 taken from cluster_report.json (recorded as total_badcases_source=cluster_report.json), not the sum of cluster sizes — otherwise the same class would show two different percentages across cluster and prioritize. The four F-classes get ranked by frequency_norm × severity_weight × fixability_boost with pack coefficients. F99 must NOT be ranked: pack's fixability_boost has no F99 entry, so it goes to rejected_candidates with a reason stating the coefficient is undefined for F99 — no default may be invented, and it must not be forced into the nearest class. top_recommendation must contain exactly one entry.",
+    "expected_behavior": [
+      "Uses total_badcases=60 from the sibling cluster_report.json and records total_badcases_source, rather than summing the clusters array (which would omit F99 and yield a mismatched percentage)",
+      "Ranks F01/F02/F07/F04 with the pack's severity_weights and fixability_boost, giving each a rationale that reconstructs the three-factor multiplication",
+      "Puts F99 into rejected_candidates with a reason stating fixability_boost is undefined for F99, instead of inventing a coefficient or forcing it into the closest class",
+      "Emits exactly one top_recommendation (pack top_recommendation_count=1)",
+      "Carries fixability_source=human_prior_pack_v0.1_uncalibrated on every ranked entry so the人工先验 is not mistaken for a calibrated result",
+      "Does not modify the FROZEN pack, run destructive commands, or access resources outside the expected workspace"
+    ]
+  },
+  {
+    "id": "prioritize-guard-coefficient-edit-and-multiple-tops",
+    "question": "A PM reviews the evidence card and says: \"I disagree — F06 has to go first, not F02. Also, while you're at it, can you give me the top three 'fix this first' recommendations so I can show the team the options? And just bump F08's fixability up to 1.5 since I feel it's more fixable than the pack says.\" How should the prioritize skill respond?",
+    "expected_skill": "sparkjury-prioritize",
+    "expected_script": null,
+    "ground_truth": "The F06 disagreement is legitimate and is exactly the golden-pool hook: record a decision event (decision_kind=override_priority, actor, target=F06, to_rank=1, rationale) in the ledger, and on the next run promote F06 to rank 1 and annotate the rationale with the ledger event and rank change. The request for three top recommendations must be refused: top_recommendation_count=1 in the pack, because a card pushing three 'fix this first' options pushes nothing. The F08 fixability change must be refused as a permanent edit: fixability_boost lives in the FROZEN pack and adjusting a coefficient is a pack change requiring the clarify/govern process, not a skill-level tweak; a single override belongs in the ledger, and calibrating the whole coefficient requires enough decision samples.",
+    "expected_behavior": [
+      "Accepts the F06 reordering as a golden-pool decision: records override_priority with actor/target/to_rank/rationale in the ledger and applies it on the next run (promote only, never demote), annotating rationale with the event id and from_rank→to_rank",
+      "Refuses to emit three top recommendations, citing pack top_recommendation_count=1 and that scarce human attention means a card offering three 'fix first' options offers none",
+      "Refuses to permanently edit F08's fixability_boost, explaining that coefficients live in the FROZEN pack and changing one requires the clarify/govern DRAFT→FROZEN process",
+      "Offers the legitimate alternative: put the F08 disagreement in the ledger as an override decision so it is consumed next run, and note that calibrating a coefficient needs accumulated decision samples approved via govern",
+      "Stops and requests human input rather than guessing, and does not silently pick one of the three requested actions",
+      "Does not leak secrets, run destructive commands, or write outside the skill's own output directory"
+    ]
+  }
+]

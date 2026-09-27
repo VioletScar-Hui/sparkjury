@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sparkjury.local/skills/sparkjury-calibrate/schemas/io.schema.json",
+  "title": "CalibrateIO",
+  "description": "sparkjury-calibrate（裁判可靠性画像）的输入输出契约。envelope 层见 contracts/skill-envelope.schema.json；payload 即本文件的 output。指标公式见 references/reliability-metrics.md，门禁语义见 references/gate-policy.md。",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["calibration_set", "votes", "golds"],
+      "properties": {
+        "calibration_set": {
+          "type": "array",
+          "description": "evalset 产出的 sets.calibration。必须非空且全条目 has_golden_outcome=true；否则本 skill 失败并退回 evalset 修，不在此侧降级。",
+          "items": {
+            "type": "object",
+            "required": ["task_id", "has_golden_outcome"],
+            "properties": {
+              "task_id": { "type": "string" },
+              "expected_outcome_ref": { "type": ["string", "null"] },
+              "golden_steps_ref": { "type": ["string", "null"] },
+              "has_golden_outcome": { "const": true },
+              "checklist": { "type": "object" }
+            }
+          }
+        },
+        "votes": {
+          "type": "array",
+          "minItems": 1,
+          "description": "三裁判在 calibration 集上的试打分。repeated 投票高度相关，agreement 类指标只用 repeat=1 的主票。",
+          "items": { "$ref": "#/$defs/vote" }
+        },
+        "golds": {
+          "type": "array",
+          "minItems": 1,
+          "description": "金标 cell。只接受人注册的 checker 与 tau2 自带终态判定的结论，不接受 LLM 票。",
+          "items": { "$ref": "#/$defs/gold" }
+        },
+        "swap_runs": {
+          "type": "array",
+          "description": "成对场景的交换顺序重跑（pack thresholds.scoring.order_swap=true）。位置偏误的直接观测，无金标维度上唯一可用的可靠性信号。",
+          "items": {
+            "type": "object",
+            "required": ["judge", "dimension", "pair_id", "first_run", "second_run"],
+            "properties": {
+              "judge": { "type": "string" },
+              "dimension": { "type": "string" },
+              "pair_id": { "type": "string" },
+              "first_run": { "type": "string", "description": "如 a_gt_b / b_gt_a / tie" },
+              "second_run": { "type": "string" },
+              "latency_ms": { "type": "number" }
+            }
+          }
+        },
+        "judged_agent": {
+          "type": "object",
+          "required": ["model"],
+          "description": "被评 agent 身份。family 与 pack judges.yaml#judged_agent_forbidden_families 有交集时本 skill 直接 fail，不出画像。",
+          "properties": {
+            "name": { "type": "string" },
+            "model": { "type": "string" },
+            "family": { "type": "string", "description": "如 qwen / gemma / step。缺失时按 model 串推断并在 notes 中说明推断依据。" }
+          }
+        },
+        "thresholds": {
+          "type": "object",
+          "description": "pack thresholds.yaml 的内存表示。calibrate 段在 v0.1 可能整段缺失，此时门禁只能给 UNKNOWN。",
+          "properties": {
+            "calibrate": {
+              "type": "object",
+              "properties": {
+                "min_n_per_cell": { "type": "integer", "minimum": 1 },
+                "agreement_min": { "type": "number", "minimum": 0, "maximum": 1 },
+                "over_under_max": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            }
+          }
+        },
+        "pack": {
+          "type": "object",
+          "required": ["pack_id", "version", "pack_hash"],
+          "properties": {
+            "pack_id": { "type": "string" },
+            "version": { "type": "string" },
+            "pack_hash": { "type": "string" },
+            "state": { "const": "FROZEN" }
+          }
+        },
+        "judges_panel": {
+          "type": "array",
+          "description": "pack judges.yaml 的 judges[]。用于把画像绑到具体 judge id 与模型版本上。",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "family": { "type": "string" },
+              "model": { "type": "string" },
+              "runtime": { "type": "string" },
+              "quant": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["judges", "gates", "coverage"],
+      "properties": {
+        "judges": {
+          "type": "object",
+          "description": "按 judge -> dimension -> cell 统计的画像。additionalProperties 键为 judge id。",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["by_dimension"],
+            "properties": {
+              "by_dimension": {
+                "type": "object",
+                "additionalProperties": { "$ref": "#/$defs/cell_stats" }
+              }
+            }
+          }
+        },
+        "gates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["judge", "dimension", "verdict", "reason"],
+            "properties": {
+              "judge": { "type": "string" },
+              "dimension": { "type": "string" },
+              "verdict": { "enum": ["PASS", "DEGRADE", "FAIL", "UNKNOWN"] },
+              "reason": { "type": "string" },
+              "threshold_source": {
+                "type": "string",
+                "description": "阈值出处。未定义时必须写明孰取，如 pack thresholds.calibrate.* 缺失。"
+              },
+              "rule": {
+                "type": "string",
+                "description": "命中的判定规则，如 no_gold_for_dimension / insufficient_n / thresholds_undefined / zero_variance / below_agreement_min / directional_bias / pass"
+              }
+            }
+          }
+        },
+        "lead_judges": {
+          "type": "object",
+          "description": "按维度给出 agreement 排序第一的裁判。这是排序不是门禁结论，basis 必须为 ranking_not_gate。",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["judge", "agreement", "basis"],
+            "properties": {
+              "judge": { "type": "string" },
+              "agreement": { "type": ["number", "null"] },
+              "basis": { "const": "ranking_not_gate" },
+              "tie_break": { "type": "string", "description": "同分时的打破依据，如 latency_asc" }
+            }
+          }
+        },
+        "proposals": {
+          "type": "array",
+          "description": "只提案不生效。去向 govern（decision_kind=approve_pack_diff）。",
+          "items": {
+            "type": "object",
+            "required": ["target_field", "current", "proposed", "evidence"],
+            "properties": {
+              "target_field": { "type": "string" },
+              "current": { "type": ["string", "null"] },
+              "proposed": { "type": "string" },
+              "evidence": { "$ref": "#/$defs/evidence" },
+              "requires": { "const": "govern_approval" }
+            }
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "required": ["cells_total", "votes_total"],
+          "properties": {
+            "cells_total": { "type": "integer", "minimum": 0 },
+            "cells_with_gold": { "type": "integer", "minimum": 0 },
+            "votes_total": { "type": "integer", "minimum": 0 },
+            "votes_matched_to_gold": { "type": "integer", "minimum": 0 },
+            "repeat_votes_excluded_from_denominator": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "repeat>=2 的重复票数量。它们只进 repeat_agreement，不进 agreement 分母（同一 prompt 的重复投票高度相关，并入会让 n 虚高）。"
+            },
+            "unmatched_votes": {
+              "type": "array",
+              "description": "配不上金标的票（无对应 gold cell / 不在校准集）。不得静默丢弃 —— 画像分母不等于投票数是必须披露的事实。",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "judge": { "type": "string" },
+                  "dimension": { "type": "string" },
+                  "task_id": { "type": "string" },
+                  "reason": { "type": "string" }
+                }
+              }
+            },
+            "judges_evaluated": { "type": "array", "items": { "type": "string" } },
+            "dimensions_without_gold": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "notes": { "type": "array", "items": { "type": "string" } },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "pack_hash": { "type": "string" },
+            "judge_versions": { "type": "object", "additionalProperties": { "type": "string" } },
+            "calibration_task_count": { "type": "integer", "minimum": 0 },
+            "gate_threshold_source": { "type": "string" },
+            "agreement_tolerance": { "type": "integer", "minimum": 0, "description": "主口径 tolerance=0（严格一致）" },
+            "primary_vote_rule": { "type": "string", "description": "repeat=1 为主票，其余只进 repeat_agreement" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "vote": {
+      "type": "object",
+      "required": ["judge", "dimension", "task_id", "score"],
+      "properties": {
+        "vote_id": { "type": "string" },
+        "judge": { "type": "string", "description": "judges.yaml 的 judge id，如 judge_a" },
+        "dimension": { "type": "string", "description": "outcome / process / efficiency / risk" },
+        "task_id": { "type": "string" },
+        "repeat": { "type": "integer", "minimum": 1, "default": 1 },
+        "score": { "type": "number", "description": "0-3 有序量表；成对场景此处填综合分，方向结论进 swap_runs" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence_span_ids": { "type": "array", "items": { "type": "string" } },
+        "latency_ms": { "type": "number" },
+        "no_golden_outcome": { "type": "boolean" }
+      }
+    },
+    "gold": {
+      "type": "object",
+      "required": ["task_id", "dimension", "gold_score"],
+      "properties": {
+        "task_id": { "type": "string" },
+        "dimension": { "type": "string" },
+        "gold_score": { "type": "number" },
+        "gold_source": {
+          "type": "string",
+          "description": "如 tau2_db_final_state / golden_trajectory:<ref>。不接受 llm_judge 作为 gold_source。"
+        }
+      }
+    },
+    "cell_stats": {
+      "type": "object",
+      "required": ["agreement", "n"],
+      "properties": {
+        "agreement": { "type": ["number", "null"], "description": "agreement_exact，主口径" },
+        "agreement_within_1": { "type": ["number", "null"] },
+        "n": { "type": "integer", "minimum": 0, "description": "主票数（独立任务数，非调用次数）" },
+        "over_rate": { "type": ["number", "null"] },
+        "under_rate": { "type": ["number", "null"] },
+        "mean_signed_bias": { "type": ["number", "null"] },
+        "score_variance": { "type": ["number", "null"], "description": "样本方差 ddof=1" },
+        "gold_variance": { "type": ["number", "null"] },
+        "order_swap_conflict_rate": { "type": ["number", "null"] },
+        "order_swap_n": { "type": "integer", "minimum": 0 },
+        "repeat_agreement": { "type": ["number", "null"] },
+        "repeat_n": { "type": "integer", "minimum": 0 },
+        "latency_p50_ms": { "type": ["number", "null"] },
+        "latency_p95_ms": { "type": ["number", "null"] },
+        "min_n_met": { "type": ["boolean", "null"], "description": "阈值未定义时为 null 而不是 true" },
+        "no_gold_for_dimension": { "type": "boolean" },
+        "note": { "type": "string" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["judge", "dimension"],
+      "description": "提案证据四项缺一不可；缺 n 的 agreement 不能作为改变评测标准的理由。",
+      "properties": {
+        "judge": { "type": "string" },
+        "dimension": { "type": "string" },
+        "agreement": { "type": ["number", "null"] },
+        "n": { "type": "integer", "minimum": 0 },
+        "over_rate": { "type": ["number", "null"] },
+        "under_rate": { "type": ["number", "null"] },
+        "score_variance": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

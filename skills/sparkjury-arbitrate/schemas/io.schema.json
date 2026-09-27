@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sparkjury.local/skills/sparkjury-arbitrate/schemas/io.schema.json",
+  "title": "ArbitrateOutput",
+  "description": "`sparkjury arbitrate --json` 的输出形状，字段逐条取自 src/sparkjury/models/arbitration.py；取值口径取自 src/sparkjury/arbiter/arbiter.py、src/sparkjury/arbiter/jev.py 与 CLI 实测输出。",
+  "type": "object",
+  "required": ["summary", "decisions"],
+  "properties": {
+    "summary": { "$ref": "#/$defs/ArbitrationSummary" },
+    "decisions": {
+      "type": "array",
+      "description": "每个 trace 一条 TraceDecision，按 store.list_panel_results() 的顺序。",
+      "items": { "$ref": "#/$defs/TraceDecision" }
+    }
+  },
+  "$defs": {
+    "Dimension": {
+      "type": "string",
+      "enum": ["outcome", "tool_use", "efficiency", "safety"],
+      "description": "src/sparkjury/models/verdict.py 的 Dimension 枚举。"
+    },
+    "DecisionSource": {
+      "type": "string",
+      "enum": ["panel", "jev", "local", "panel_fallback"],
+      "description": "src/sparkjury/models/arbitration.py 的 DecisionSource 枚举。panel=一致采中位数；jev=Jev 裁决；local=Jev 不可达本地裁判裁决（降级）；panel_fallback=全失败回退中位数（降级）。降级当且仅当 source ∈ {local, panel_fallback}。"
+    },
+    "ArbitrationSummary": {
+      "type": "object",
+      "description": "TraceStore.arbitration_summary() 的输出，CLI 末行也打印同一组数。",
+      "required": ["n_traces", "n_dimensions", "by_source", "n_degraded"],
+      "properties": {
+        "n_traces": { "type": "integer" },
+        "n_dimensions": { "type": "integer", "description": "仲裁过的 dimension 条数（trace x dimension）。" },
+        "by_source": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" },
+          "description": "DecisionSource -> 条数。只出现实际用到的来源。"
+        },
+        "n_degraded": {
+          "type": "integer",
+          "description": "degraded=true 的条数，**恒等于 by_source['local'] + by_source['panel_fallback']**。这是本 skill 最重要的质量信号。"
+        },
+        "n_audited_dimensions": { "type": "integer", "description": "被 5% 抽样审计的 dimension 条数。" },
+        "n_audit_disagreements": { "type": "integer" },
+        "n_outcome_fail": { "type": "integer" },
+        "mean_final_score": { "type": ["number", "null"] }
+      }
+    },
+    "TraceDecision": {
+      "type": "object",
+      "required": ["trace_id", "arbitrations"],
+      "properties": {
+        "trace_id": { "type": "string" },
+        "arbitrations": {
+          "type": "array",
+          "description": "每个被评 dimension 一条，顺序跟随 panel.agreement。",
+          "items": { "$ref": "#/$defs/Arbitration" }
+        }
+      }
+    },
+    "Arbitration": {
+      "type": "object",
+      "required": ["trace_id", "dimension", "source", "degraded"],
+      "properties": {
+        "trace_id": { "type": "string" },
+        "dimension": { "$ref": "#/$defs/Dimension" },
+        "final_score": {
+          "type": ["integer", "null"],
+          "description": "0..4；null = 无可用裁判分。jev 通道下由 parse_score() 归一化并夹紧到 [0, n_levels-1]。"
+        },
+        "final_label": {
+          "type": ["string", "null"],
+          "enum": ["pass", "fail", null],
+          "description": "仅 outcome 维有值；其余维恒 null。"
+        },
+        "source": { "$ref": "#/$defs/DecisionSource" },
+        "degraded": {
+          "type": "boolean",
+          "description": "降级标记。**pack 红线 2 要求它同时进 run manifest**（字段名差异见 references/arbitration-rules.md §5）。"
+        },
+        "panel_scores": {
+          "type": "object",
+          "additionalProperties": { "type": ["integer", "null"] },
+          "description": "judge 席位名 -> 原始分。失败裁判的值为 null。"
+        },
+        "panel_labels": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "null"] },
+          "description": "judge 席位名 -> 原始标签（仅 outcome 维有意义）。"
+        },
+        "jev_confidence": { "type": ["number", "null"], "description": "Jev 返回的置信度；非 jev 通道为 null。" },
+        "jev_raw_score": {
+          "type": ["number", "null"],
+          "description": "Jev 在量表上的未夹紧位置（经 legend 偏移归一化）。与 final_score 不同即说明发生了夹紧。"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "panel 通道为 'panel agreed: <agreement.reason>'；jev 通道为 'Jev <model>: position X on N levels[, confidence C]'；降级通道以 '[degraded: <原因>]' 开头。"
+        },
+        "latency_ms": { "type": ["number", "null"], "description": "jev 或 local 通道的调用耗时；panel 通道为 null。" },
+        "error": {
+          "type": ["string", "null"],
+          "description": "仅 panel_fallback 通道非 null，携带合并后的失败原因（jev 原因 + local 原因）。"
+        },
+        "audit_sampled": {
+          "type": "boolean",
+          "description": "是否被 5% 抽样选中。判据 = sha1('audit|<trace_id>') % 10000 / 10000 < audit_rate，确定性，与顺序无关。"
+        },
+        "audit_score": { "type": ["integer", "null"] },
+        "audit_label": { "type": ["string", "null"], "enum": ["pass", "fail", null] },
+        "audit_disagrees": {
+          "type": ["boolean", "null"],
+          "description": "outcome 维比标签，其余维比 |score 差| > 1。审计裁判失败时为 null。"
+        }
+      }
+    }
+  }
+}

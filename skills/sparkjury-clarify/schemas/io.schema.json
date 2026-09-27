@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sparkjury.local/skills/sparkjury-clarify/schemas/io.schema.json",
+  "title": "ClarifyIO",
+  "description": "sparkjury-clarify（澄清期 pack diff 提案）的输入输出契约。envelope 层见 contracts/skill-envelope.schema.json；decision 事件结构见 contracts/event-ledger.schema.json。本 skill 只产出提案，不落 pack、不冻结、不写 checker 实现。",
+  "type": "object",
+  "required": ["input", "output"],
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["source_text", "pack_state"],
+      "properties": {
+        "source_text": {
+          "type": "string",
+          "description": "PM 的自然语言标准描述原文，逐字保留供回溯"
+        },
+        "pack_state": {
+          "enum": ["DRAFT", "FROZEN"],
+          "description": "来自 standards/scenario-pack/pack.manifest.json 的 state；FROZEN + 改动意图 => 交 govern thaw"
+        },
+        "pack_manifest_ref": {
+          "type": "string",
+          "description": "pack.manifest.json 路径（只读）"
+        },
+        "pack_dir": {
+          "type": "string",
+          "description": "standards/scenario-pack/ 路径（只读），用于扫描 current 值"
+        },
+        "run_id": {
+          "type": "string",
+          "description": "挂靠的 run；治理期无具体 run 时用 governance",
+          "default": "governance"
+        },
+        "golden_proposals_ref": {
+          "type": ["string", "null"],
+          "description": "govern 的 governance/proposals.json 路径；黄金池投影信号，可为空",
+          "default": null
+        },
+        "prior_answers": {
+          "type": "array",
+          "description": "用户已自发答出的维度，避免重复追问",
+          "items": { "type": "object" },
+          "default": []
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["clarification_session"],
+      "properties": {
+        "clarification_session": { "$ref": "#/$defs/clarification_session" }
+      }
+    }
+  },
+  "$defs": {
+    "clarification_session": {
+      "type": "object",
+      "required": ["questions_asked", "answers", "proposal", "pending_items"],
+      "properties": {
+        "questions_asked": {
+          "type": "array",
+          "description": "本轮实际问出的问题，硬上限 5 条（QUESTION_BUDGET）",
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "required": ["id", "question", "maps_to"],
+            "properties": {
+              "id": { "enum": ["Q1", "Q2", "Q3", "Q4", "Q5"] },
+              "question": { "type": "string", "description": "问人的原话，只围绕标准定义" },
+              "maps_to": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "本问对应 pack 字段路径，如 rubrics.yaml:dimensions[].weight"
+              },
+              "default_if_unanswered": { "type": "string" }
+            }
+          }
+        },
+        "answers": {
+          "type": "object",
+          "description": "问题 id => 答案；答案 kind ∈ {explicit, directional, default, skipped}",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "enum": ["explicit", "directional", "default", "skipped"] },
+              "text": { "type": "string", "description": "用户原话" },
+              "weights": {
+                "type": "object",
+                "description": "kind=explicit 时的四维权重，四者和须为 1.0",
+                "properties": {
+                  "outcome": { "type": "number" },
+                  "process": { "type": "number" },
+                  "efficiency": { "type": "number" },
+                  "risk": { "type": "number" }
+                }
+              },
+              "direction": { "type": "string", "description": "kind=directional 时的方向描述，如 raise_risk" },
+              "value": { "type": ["string", "number", "boolean", "null"] }
+            }
+          }
+        },
+        "proposal": {
+          "type": "object",
+          "required": ["status", "pack_diff", "checker_contracts", "pending_items"],
+          "properties": {
+            "status": {
+              "enum": ["zero_change", "pending_approval"],
+              "description": "zero_change=零改动收敛；pending_approval=等人批准，均未生效"
+            },
+            "pack_diff": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/pack_diff_entry" }
+            },
+            "checker_contracts": {
+              "type": "array",
+              "description": "checker 契约提案（id/输入/判据描述），红线：不含任何实现",
+              "items": {
+                "type": "object",
+                "required": ["id", "input", "criterion"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "task_id_pattern": { "type": "string" },
+                  "input": { "type": "string" },
+                  "output": { "type": "string" },
+                  "criterion": { "type": "string", "description": "判什么、怎么算通过，纯文字描述" }
+                }
+              }
+            },
+            "no_change_reason": {
+              "type": "array",
+              "description": "pack 已覆盖、故不产生 diff 的诉求及其依据",
+              "items": { "type": "string" }
+            },
+            "pending_items": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "pending_items": {
+          "type": "array",
+          "description": "未决项清单：方向型答案、超预算未答、扫描不到的 current",
+          "items": { "type": "string" }
+        },
+        "degraded_flags": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "clarify_direction_only",
+              "clarify_budget_exhausted",
+              "golden_pool_cold",
+              "pack_frozen_requires_thaw"
+            ]
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "source_text": { "type": "string" },
+            "pack_id": { "type": "string" },
+            "pack_version": { "type": "string" },
+            "pack_state": { "type": "string" },
+            "ledger_event_ids": { "type": "array", "items": { "type": "string" } },
+            "golden_pool_support": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "pack_diff_entry": {
+      "type": "object",
+      "required": ["target_file", "field", "current", "rationale", "impact"],
+      "properties": {
+        "target_file": {
+          "type": "string",
+          "description": "相对项目根的文件路径，如 standards/scenario-pack/rubrics.yaml；只描述不改写"
+        },
+        "field": {
+          "type": "string",
+          "description": "YAML 路径，如 dimensions[id=risk].weight / regress.pass_k"
+        },
+        "current": {
+          "description": "pack 现值，由脚本行扫描读出；扫描不到时不得填（整条提案作废）",
+          "type": ["string", "number", "boolean", "null"]
+        },
+        "proposed": {
+          "description": "建议值；方向型答案时为 null，由人在 DRAFT 期填写",
+          "type": ["string", "number", "boolean", "null"]
+        },
+        "direction": {
+          "enum": ["raise", "lower", "replace", "add", "remove"],
+          "description": "proposed 为 null 时必填，供人判断方向"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "必须引用用户原话或 ledger event_id；不许编造行业惯例"
+        },
+        "impact": {
+          "type": "object",
+          "required": ["affected_skills", "affected_dimensions"],
+          "properties": {
+            "affected_skills": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "推导规则见 references/pack-diff-format.md"
+            },
+            "affected_dimensions": {
+              "type": "array",
+              "items": { "enum": ["outcome", "process", "efficiency", "risk", "all", "none"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}
