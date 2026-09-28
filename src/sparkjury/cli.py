@@ -155,6 +155,10 @@ def score(
     limit: int | None = typer.Option(None, "--limit"),
     workers: int | None = typer.Option(None, "--workers"),
     trace_id: str | None = typer.Option(None, "--trace", help="score a single trace"),
+    evalset: Path | None = typer.Option(None, "--evalset", exists=True,
+                                        help="runs/<id>/evalset.json: judge exactly these trace ids and nothing else"),
+    allow_self_judge: bool = typer.Option(False, "--allow-self-judge",
+                                          help="let a judge whose model equals the agent under test stay on the panel (loud escape hatch)"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """Score prechecked traces with the judge panel (M3). Disagreements are flagged for arbitration."""
@@ -177,8 +181,26 @@ def score(
             traces = [t]
         else:
             traces = store.scorable_traces()
+            if evalset is not None:
+                keep = set(json.loads(evalset.read_text(encoding="utf-8")))
+                traces = [t for t in traces if t.trace_id in keep]
+                if not traces:
+                    # 空交集不许静默：打零条还报成功，和「没跑」在输出里长得一样
+                    err_console.print(f"[red]--evalset {evalset} matches no scorable trace in {db}[/]")
+                    raise typer.Exit(code=1)
             if limit:
                 traces = traces[:limit]
+        # SKILL.md edge case, enforced: the agent under test's own model must not sit on the panel.
+        subjects = {t.agent_model for t in traces if t.agent_model}
+        offenders = [f"{j.name} ({j.model})" for j in cfg.judges if j.model in subjects]
+        if offenders:
+            if allow_self_judge:
+                err_console.print(f"[yellow]self-judge allowed explicitly:[/] {', '.join(offenders)} "
+                                  "is the agent under test scoring itself; results are not independent")
+            else:
+                err_console.print(f"[red]refusing to score:[/] {', '.join(offenders)} is the model under test — "
+                                  "a model grading itself is not a judge. Pass --allow-self-judge to override.")
+                raise typer.Exit(code=1)
         results = panel.score_many(traces)
         store.put_panel_results(results)
         summary = store.verdict_summary()
