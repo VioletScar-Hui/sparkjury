@@ -34,6 +34,9 @@ model = "step-3.7-flash"
 base_url = "https://api.stepfun.com/v1"
 api_key_env = "STEPFUN_API_KEY"
 timeout_s = 60
+# step-3.7-flash 是 reasoning 模型：思考文本计入 completion 预算，默认 max_tokens 会被
+# 思考吃满、content 截空报 "no JSON object"（节点实测 44% 裁决翻车）。给足预算。
+max_tokens = 4000
 
 # Offline / demo fallback: replace any judge above with a mock one
 # [[panel.judges]]
