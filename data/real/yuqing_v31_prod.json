@@ -1,0 +1,2365 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "yuqing_tagging_agent"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "sparkjury.real.yuqing.v31"
+     },
+     "spans": [
+      {
+       "traceId": "mmeiijhbfbiejmlgbjangbgiaagfnpgo",
+       "spanId": "ejgenineljhogkgo",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889356174000128",
+       "endTimeUnixNano": "1789889356174000128",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-pkdbiopgjc"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "借楼转卖"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "mmeiijhbfbiejmlgbjangbgiaagfnpgo",
+       "spanId": "lpfcoakodpookfjf",
+       "parentSpanId": "ejgenineljhogkgo",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889356174000128",
+       "endTimeUnixNano": "1789889356174000128",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"eifgaifiphkb\\\", \\\"text\\\": \\\"出吗\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "gmpbpefmgkpbgjlghemhnnalooekgogi",
+       "spanId": "gnaokkmdgoloiddg",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889349144000000",
+       "endTimeUnixNano": "1789889349144000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-cekphpfane"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "抽奖没中"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "gmpbpefmgkpbgjlghemhnnalooekgogi",
+       "spanId": "cljcdpfecalgpbgk",
+       "parentSpanId": "gnaokkmdgoloiddg",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889349144000000",
+       "endTimeUnixNano": "1789889349144000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"pnggldpapooe\\\", \\\"text\\\": \\\"感觉我们这边的店里根本没有三等奖以上的[笑哭R]\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "fmdnebknibaacoocdcdkjbclachmlloc",
+       "spanId": "ofamnjaegadpcope",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889345457999872",
+       "endTimeUnixNano": "1789889345457999872",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-gpgijihlle"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "抽奖没中"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "fmdnebknibaacoocdcdkjbclachmlloc",
+       "spanId": "pkbjphbkaeopcpia",
+       "parentSpanId": "ofamnjaegadpcope",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889345457999872",
+       "endTimeUnixNano": "1789889345457999872",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"bpafgkhpfgag\\\", \\\"text\\\": \\\"一模一样的编号，我的没有[抓狂R][抓狂R][抓狂R]\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "mfjeokiafegimdljfjlhbcaimkejokmi",
+       "spanId": "nncofckfkdhkcnnk",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889300375000064",
+       "endTimeUnixNano": "1789889300375000064",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-pmgfeppdda"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "借楼转卖"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "mfjeokiafegimdljfjlhbcaimkejokmi",
+       "spanId": "iafnlfdbcgmjnkmc",
+       "parentSpanId": "nncofckfkdhkcnnk",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889300375000064",
+       "endTimeUnixNano": "1789889300375000064",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"edghdckodnje\\\", \\\"text\\\": \\\"双杯六折券可以帮点\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "lofaajohggecdeompihaejonblhhpljb",
+       "spanId": "fdbmpndbgeojkfbb",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889292305999872",
+       "endTimeUnixNano": "1789889292305999872",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-cgehmjdfkc"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "门店客观陈述"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "lofaajohggecdeompihaejonblhhpljb",
+       "spanId": "bmhpdfcmoidhipph",
+       "parentSpanId": "fdbmpndbgeojkfbb",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889292305999872",
+       "endTimeUnixNano": "1789889292305999872",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"chdgaapododo\\\", \\\"text\\\": \\\"我们学校的品牌A都拆了[捂脸R]\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "lahcjhgfecdnjoiknlbblphibmpgclbl",
+       "spanId": "kokaehnilinnchcb",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889268488000000",
+       "endTimeUnixNano": "1789889268488000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-eidplekfjf"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "借楼转卖"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "lahcjhgfecdnjoiknlbblphibmpgclbl",
+       "spanId": "ifkcekigeeoepbap",
+       "parentSpanId": "kokaehnilinnchcb",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889268488000000",
+       "endTimeUnixNano": "1789889268488000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"iiaodeknnenh\\\", \\\"text\\\": \\\"出0.01不，宝贝\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "ehoiaeckbjffkgpanfphoaljoddkkcja",
+       "spanId": "fiefpdhhjhbepilc",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889256890000128",
+       "endTimeUnixNano": "1789889256890000128",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-opidbidkkd"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "借楼转卖"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "ehoiaeckbjffkgpanfphoaljoddkkcja",
+       "spanId": "aegijmjiooaflaeh",
+       "parentSpanId": "fiefpdhhjhbepilc",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889256890000128",
+       "endTimeUnixNano": "1789889256890000128",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"nokpagjkhacp\\\", \\\"text\\\": \\\"我中了可以出给你\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "fneaibkljlbkjillnobfjfbonhnjiimo",
+       "spanId": "aimlpfelphgpnkij",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889254507000064",
+       "endTimeUnixNano": "1789889254507000064",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-ohlelfgjlf"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "抽奖没中"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "fneaibkljlbkjillnobfjfbonhnjiimo",
+       "spanId": "mgolbhhppclfekhh",
+       "parentSpanId": "aimlpfelphgpnkij",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889254507000064",
+       "endTimeUnixNano": "1789889254507000064",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"lcfbgldbaghf\\\", \\\"text\\\": \\\"一撕开，心死了\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "ehpdckjaejkfgbcadfjchlmihibdaohl",
+       "spanId": "kfbbocehddpalack",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889247175000064",
+       "endTimeUnixNano": "1789889247175000064",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-dkcmdfjopd"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "个人偏好"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "ehpdckjaejkfgbcadfjchlmihibdaohl",
+       "spanId": "fknienbogfmgmgke",
+       "parentSpanId": "kfbbocehddpalack",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889247175000064",
+       "endTimeUnixNano": "1789889247175000064",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"pmjapipomdpo\\\", \\\"text\\\": \\\"我意思三個獎品入邊這個最不想要[笑哭R]\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "akmdhjpgnonpabcgpkjdjjalancachmj",
+       "spanId": "planeffainjecicb",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889209027000064",
+       "endTimeUnixNano": "1789889209027000064",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-nifjamfdba"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "借楼转卖"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "akmdhjpgnonpabcgpkjdjjalancachmj",
+       "spanId": "decaaahnljphjmlf",
+       "parentSpanId": "planeffainjecicb",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889209027000064",
+       "endTimeUnixNano": "1789889209027000064",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"ejmgfggpkkmm\\\", \\\"text\\\": \\\"出地毯吗\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "acoajaddcbkcamhafdagjjieagndjfjb",
+       "spanId": "aadfcjljngaadmda",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889202841000192",
+       "endTimeUnixNano": "1789889202841000192",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-eplbkbkibj"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "借楼转卖"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "acoajaddcbkcamhafdagjjieagndjfjb",
+       "spanId": "mjgkfehjdahkffmi",
+       "parentSpanId": "aadfcjljngaadmda",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889202841000192",
+       "endTimeUnixNano": "1789889202841000192",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"dddgakbcgjge\\\", \\\"text\\\": \\\"我也中了一等奖有想要地毯的可以私我，我出\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "ahhkmlhmnahlbgcppjakcfmiandnhadg",
+       "spanId": "hljikfokgcoemaid",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889192694000128",
+       "endTimeUnixNano": "1789889192694000128",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-klpinmhflo"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "个人偏好"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "ahhkmlhmnahlbgcppjakcfmiandnhadg",
+       "spanId": "kfaoehbnopgjcohf",
+       "parentSpanId": "hljikfokgcoemaid",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889192694000128",
+       "endTimeUnixNano": "1789889192694000128",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"dmmefoalfdck\\\", \\\"text\\\": \\\"[失望R]这个最不想要了\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "hngaaepfgpodbeipmhncfnoppieojlnk",
+       "spanId": "mohnkoogjjnaiifb",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889173272999936",
+       "endTimeUnixNano": "1789889173272999936",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-cclanbnfbk"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "借楼转卖"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "hngaaepfgpodbeipmhncfnoppieojlnk",
+       "spanId": "holhkgkpjagkmlbd",
+       "parentSpanId": "mohnkoogjjnaiifb",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889173272999936",
+       "endTimeUnixNano": "1789889173272999936",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"gihmlmkibnla\\\", \\\"text\\\": \\\"想要地毯，出吗\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "edjgkocdmgnoicbokhbbiohbihholbnn",
+       "spanId": "imbhngdibefcnoeh",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889504548000000",
+       "endTimeUnixNano": "1789889504548000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-jdfkaofbph"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "正向"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "漏掉的正向"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "edjgkocdmgnoicbokhbbiohbihholbnn",
+       "spanId": "imegoagaghbkjkga",
+       "parentSpanId": "imbhngdibefcnoeh",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889504548000000",
+       "endTimeUnixNano": "1789889504548000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"ilcjajhjbooi\\\", \\\"text\\\": \\\"中式美学的权威之处\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"中性\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "jaimgigmaaocpiejknejfjkncmkmkacn",
+       "spanId": "mojfpfeclminokpn",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889435033999872",
+       "endTimeUnixNano": "1789889435033999872",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-ebkhcanald"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "情绪符号当情感"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "jaimgigmaaocpiejknejfjkncmkmkacn",
+       "spanId": "ghmenfckaimggfkc",
+       "parentSpanId": "mojfpfeclminokpn",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889435033999872",
+       "endTimeUnixNano": "1789889435033999872",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"apjmkmeemioh\\\", \\\"text\\\": \\\"就是[呃R]\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "bpflkkdcpidpbnggjiplkoadifogpnkg",
+       "spanId": "oaebbndcdoogmjmk",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889133276999936",
+       "endTimeUnixNano": "1789889133276999936",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-nhaphflhld"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "负向"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "混合评价或惋惜"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "bpflkkdcpidpbnggjiplkoadifogpnkg",
+       "spanId": "pdcelglnedpocjja",
+       "parentSpanId": "oaebbndcdoogmjmk",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889133276999936",
+       "endTimeUnixNano": "1789889133276999936",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"gkkkcnmigcfl\\\", \\\"text\\\": \\\"我还是喜欢产品A7，但是下架了[哭惹R]\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"负向\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "bofadodkhliddalkbifjnklgcmcabdle",
+       "spanId": "cahlciemfnbommfd",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889501896000000",
+       "endTimeUnixNano": "1789889501896000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-ampcnoienl"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "正向"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "漏掉的正向"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "bofadodkhliddalkbifjnklgcmcabdle",
+       "spanId": "ghoalpnbblkjinfo",
+       "parentSpanId": "cahlciemfnbommfd",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889501896000000",
+       "endTimeUnixNano": "1789889501896000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"aignhfhdlimm\\\", \\\"text\\\": \\\"猫狗这个也好看[完啦R]\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"中性\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "jhcclpcpafdcohphbiighmhfmjfldhbp",
+       "spanId": "aebakiepampioogl",
+       "parentSpanId": "",
+       "name": "invoke_agent yuqing_tagging_agent",
+       "kind": 1,
+       "startTimeUnixNano": "1789889462424000000",
+       "endTimeUnixNano": "1789889462424000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "invoke_agent"
+         }
+        },
+        {
+         "key": "gen_ai.agent.name",
+         "value": {
+          "stringValue": "yuqing_tagging_agent"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "sparkjury.task_id",
+         "value": {
+          "stringValue": "yq-cplhkplind"
+         }
+        },
+        {
+         "key": "sparkjury.trial",
+         "value": {
+          "intValue": "0"
+         }
+        },
+        {
+         "key": "sparkjury.success",
+         "value": {
+          "boolValue": false
+         }
+        },
+        {
+         "key": "sparkjury.domain",
+         "value": {
+          "stringValue": "marketing_yuqing"
+         }
+        },
+        {
+         "key": "yuqing.prompt_version",
+         "value": {
+          "stringValue": "V3.1"
+         }
+        },
+        {
+         "key": "yuqing.model_label",
+         "value": {
+          "stringValue": "中性"
+         }
+        },
+        {
+         "key": "yuqing.human_label",
+         "value": {
+          "stringValue": "正向"
+         }
+        },
+        {
+         "key": "yuqing.gold_source",
+         "value": {
+          "stringValue": "生产人工改判"
+         }
+        },
+        {
+         "key": "yuqing.relabel_cause",
+         "value": {
+          "stringValue": "漏掉的正向"
+         }
+        },
+        {
+         "key": "yuqing.timestamp_note",
+         "value": {
+          "stringValue": "时间戳是人工复核时间，不是模型调用时间"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "jhcclpcpafdcohphbiighmhfmjfldhbp",
+       "spanId": "nkiaeniecphaionf",
+       "parentSpanId": "aebakiepampioogl",
+       "name": "chat production-v3.1（模型名未随导出留存）",
+       "kind": 1,
+       "startTimeUnixNano": "1789889462424000000",
+       "endTimeUnixNano": "1789889462424000000",
+       "attributes": [
+        {
+         "key": "gen_ai.operation.name",
+         "value": {
+          "stringValue": "chat"
+         }
+        },
+        {
+         "key": "gen_ai.request.model",
+         "value": {
+          "stringValue": "production-v3.1（模型名未随导出留存）"
+         }
+        },
+        {
+         "key": "gen_ai.input.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"system\", \"parts\": [{\"type\": \"text\", \"content\": \"舆情评论打标 Agent，System Prompt V3.1。任务：判断目标评论对目标品牌的情感（正向/中性/负向），负向时给出负面归因大类。Prompt 全文属业务方资产，不随数据公开。\"}]}, {\"role\": \"user\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"说明\\\": \\\"生产导出只保留了评论本身，笔记正文与评论串未留存\\\", \\\"comments\\\": [{\\\"id\\\": \\\"oengbicjlcpc\\\", \\\"text\\\": \\\"联名方C主理人的牌子诶，这联名可以啊\\\"}]}\"}]}]"
+         }
+        },
+        {
+         "key": "gen_ai.output.messages",
+         "value": {
+          "stringValue": "[{\"role\": \"assistant\", \"parts\": [{\"type\": \"text\", \"content\": \"{\\\"sentiment\\\": \\\"中性\\\", \\\"说明\\\": \\\"生产环境只落了最终标签，原始响应未留存\\\"}\"}], \"finish_reason\": \"stop\"}]"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
