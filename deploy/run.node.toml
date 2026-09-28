@@ -30,9 +30,11 @@ model = "step-3.7-flash"
 base_url = "https://api.stepfun.com/v1"
 api_key_env = "STEPFUN_API_KEY"
 timeout_s = 60
-# step-3.7-flash 是 reasoning 模型：思考文本也计入 completion 预算，默认 1200 会被思考吃满、
-# content 截空，报 "no JSON object"（2026-09-28 节点实测 23/52 份裁决翻车，judge_a/b 零错误）。
-max_tokens = 4000
+# step-3.7-flash 是 reasoning 模型：思考文本也计入 completion 预算（实测小 prompt 思考就 1000+ token），
+# 默认 1200 被思考吃满、content 截空报 "no JSON object"（节点实测 23/52 翻车，提到 4000 仍剩 10/52）。
+# 预算给足 + response_format 强制纯 JSON（消掉 JSON 夹散文的解析失败），两者缺一不可。
+max_tokens = 6000
+extra_body = { response_format = { type = "json_object" } }
 [arbiter]
 jev = "auto"
 audit_rate = 0.1
