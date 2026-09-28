@@ -240,7 +240,7 @@ run_id、总数、环境问题数、真 badcase 数、clusters[]（label / count
 | M6 | 证据卡片 + 回归对比 | P0 | 已完成，16 个用例 | `sparkjury-report` + `sparkjury-regress` |
 | M7 | Harness 编排器 | P0 | 已完成，10 个用例 | 六个技能调的都是它的 CLI |
 | M8 | API + Agent Cockpit | 后端 P0 / 前端 P1 | 后端与兜底页已完成，13 个用例 | 不对应：读产物、触发 run |
-| M9 | Agent Skills 打包 + NeMo Agent Toolkit | P1 | 已完成，16 个用例（3 个跳过） | 六个技能本体 |
+| M9 | Agent Skills 打包 + NeMo Agent Toolkit | P1 | 已完成，23 个用例（3 个跳过） | 六个技能本体 |
 | M10 | DGX 部署 + τ²-bench 跑数 + 演示数据 | P0 | 脚本与 token 已完成，18 个用例；节点上执行待做 | 不对应：把环境与 trace 跑出来 |
 | M11 | README / 征文 / 视频脚本 | P0 | 初稿已完成，2 个用例；截图、真实数字、录制待补 | 不对应：文档与视频 |
 | M12 | 跨平台与仓库约定守卫 | P1 | 已完成，18 个用例 | 不对应：跨平台与仓库约定 |
@@ -512,7 +512,7 @@ durable 那一段：
 
 ## 17. 当前进度与验证方法
 
-M1 到 M13 已完成（M10 节点执行、M11 录制待做），277 个 pytest 用例通过。一条命令跑通全流程：
+M1 到 M13 已完成（M10 节点执行、M11 录制待做），284 个 pytest 用例通过。一条命令跑通全流程：
 
 ```
 cd sparkjury

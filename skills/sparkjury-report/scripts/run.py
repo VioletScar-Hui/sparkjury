@@ -44,11 +44,16 @@ def main(argv: list[str]) -> int:
         rc = cli("score", *argv)
         if rc:
             return rc
-        keep, skip = [], {"--dims", "--limit", "--workers"}
+        # arbitrate 只认 score 打完后的分歧，score 专属选项不能透传：
+        # 带值的跳两格，布尔开关跳一格（按两格跳会吞掉后面的参数）。
+        keep, skip2, skip1 = [], {"--dims", "--limit", "--workers", "--evalset"}, {"--allow-self-judge"}
         i = 0
         while i < len(argv):
-            if argv[i] in skip:
+            if argv[i] in skip2:
                 i += 2
+                continue
+            if argv[i] in skip1:
+                i += 1
                 continue
             keep.append(argv[i])
             i += 1

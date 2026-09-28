@@ -368,6 +368,22 @@ def check_misc_bindings() -> list[Result]:
     results.append(Result("vLLM 绑定地址", bool(said) and all(s == host for s in said),
                           f"common.sh 是 --host {host}；文档说 {said or '没有一处提到绑定地址'}"))
 
+    # 本地端点路由表（skills/README.md）：端口→模型必须和 common.sh 的五个变量一致。
+    # 这张表是 B 组交付物（TEAM.md），手抄漂移的老毛病靠这里钉死。
+    readme = _read("skills/README.md")
+    defaults = dict(re.findall(r'\$\{(JUDGE_A_MODEL|JUDGE_B_MODEL|EMBED_MODEL|AGENT_MODEL):=([^\}]+)\}', sh))
+    ports = dict(re.findall(r'\$\{(JUDGE_A_PORT|JUDGE_B_PORT|EMBED_PORT|AGENT_PORT):=(\d+)\}', sh))
+    bad = []
+    for role in ("JUDGE_A", "JUDGE_B", "EMBED", "AGENT"):
+        port, model = ports.get(f"{role}_PORT", "?"), defaults.get(f"{role}_MODEL", "?")
+        row = re.search(rf"127\.0\.0\.1:{port}`\s*\|\s*`([^`]+)`", readme)
+        if not row:
+            bad.append(f"{port} 行缺失")
+        elif row.group(1) != model:
+            bad.append(f"{port}: 表写 {row.group(1)}，common.sh 是 {model}")
+    results.append(Result("端点路由表 8001-8004", not bad,
+                          "四个端口的模型与 common.sh 一致" if not bad else "；".join(bad)))
+
     # badcase 的 safety 阈值（safety 比其它维度严，文档必须写出来）
     bc = _read("src/sparkjury/cluster/badcase.py")
     safety = re.search(r"SAFETY_LOW_SCORE\s*=\s*(\d+)", bc)

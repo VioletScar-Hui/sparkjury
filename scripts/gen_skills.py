@@ -14,6 +14,8 @@ SKILLS: dict[str, dict[str, str]] = {
     "sparkjury-clean": dict(
         cmd="ingest + precheck",
         mode="ingest+precheck",
+        data='Reads local trace files and writes them into a local SQLite store. No model is called: ingestion and the precheck rules are deterministic code, so no trace content leaves the machine.',
+        network='None.',
         desc=(
             "Ingest agent traces (tau2-bench results JSON or OpenTelemetry GenAI span exports) into a SparkJury store "
             "and label environment-caused failures (timeouts, tool outages, permission errors, broken user simulator) "
@@ -46,6 +48,8 @@ Or run both in one call: `python scripts/run.py --path <file> --source tau2 --db
     "sparkjury-evalset": dict(
         cmd="run --stages EVALSET",
         mode="evalset",
+        data='Reads the local SQLite store only, to pick which traces get judged. No model is called.',
+        network='None.',
         desc=(
             "Build the evaluation set for a SparkJury run: pick the scorable traces (precheck-clean), optionally restrict "
             "to given task ids or cap the count, and write runs/<run_id>/evalset.json. Use when you want a reproducible, "
@@ -61,6 +65,7 @@ Or run both in one call: `python scripts/run.py --path <file> --source tau2 --db
    `sparkjury run --config <run.toml> --stages EVALSET` (set `[evalset] limit` / `task_ids` in the TOML), or
    `python scripts/run.py --db <store.db> --run-id <id> [--limit N] [--task-ids a,b]`
 3. The stage writes `runs/<run_id>/evalset.json` (list of trace ids) and records `n_traces`, `n_tasks` in the manifest.
+4. Hand the file to scoring: `sparkjury score --evalset runs/<run_id>/evalset.json ...` judges exactly these ids (standalone `score` without it judges every scorable trace).
 
 ## Output
 - `runs/<run_id>/evalset.json`
@@ -74,6 +79,8 @@ Or run both in one call: `python scripts/run.py --path <file> --source tau2 --db
     "sparkjury-score": dict(
         cmd="score + arbitrate",
         mode="score+arbitrate",
+        data='Sends trace excerpts to the three judge endpoints: Judge A and Judge B on local vLLM by default, Judge C on the StepFun cloud API (a mock judge stands in when `STEPFUN_API_KEY` is unset). Disagreements go to the Jev cloud API (TypeSafe) when `TYPESAFE_API_KEY` is set, and fall back to local Judge A arbitration marked degraded otherwise. Nothing else leaves the machine.',
+        network='Required for scoring: Judge A / Judge B (local vLLM), Judge C (StepFun). Optional for arbitration: Jev (TypeSafe).',
         desc=(
             "Score agent traces with a three-judge panel (three different model families) on four dimensions - outcome, "
             "tool_use, efficiency, safety - then resolve disagreements: cloud Jev decision model when configured, local "
@@ -86,7 +93,8 @@ Or run both in one call: `python scripts/run.py --path <file> --source tau2 --db
 
 ## Steps
 1. Choose judges: `mock` (offline) or a panel TOML (see `deploy/judges.example.toml`; keys come from env vars such as `STEPFUN_API_KEY`).
-2. Score: `sparkjury score --db <store.db> --judges mock|<panel.toml> [--dims outcome,tool_use,efficiency,safety] [--limit N]`
+2. Score: `sparkjury score --db <store.db> --judges mock|<panel.toml> [--evalset runs/<id>/evalset.json] [--dims outcome,tool_use,efficiency,safety] [--limit N]`
+   `--evalset` judges exactly the trace ids `sparkjury-evalset` fixed and nothing else; an evalset matching no scorable trace exits non-zero instead of silently scoring nothing.
 3. Arbitrate: `sparkjury arbitrate --db <store.db> --judges mock|<panel.toml> [--jev auto|off] [--audit-rate 0.05]`
    (`TYPESAFE_API_KEY` enables Jev; without it every disagreement is resolved locally and flagged degraded)
 4. Inspect one trace: `sparkjury verdicts <trace_id> --db <store.db>`
@@ -101,12 +109,14 @@ One call: `python scripts/run.py --db <store.db> --judges mock`
 
 ## Edge cases
 - Judges that fail their health check are swapped for mock judges by the harness (`sparkjury run`), never silently.
-- The agent under test's own model must not sit on the panel.
+- The agent under test's own model must not sit on the panel — enforced: `score` refuses such a panel (a model grading itself is not a judge) unless `--allow-self-judge` is passed explicitly.
 """,
     ),
     "sparkjury-cluster": dict(
         cmd="cluster",
         mode="cluster",
+        data='Reads the local SQLite store. Badcase text goes to the embedding endpoint (Qwen3-Embedding on local vLLM by default, hashing embedder as the offline fallback) and cluster representatives go to the Jev cloud API for labelling when `TYPESAFE_API_KEY` is set; otherwise labels fall back to heuristic rules.',
+        network='Optional: local embedding endpoint, Jev (TypeSafe).',
         desc=(
             "Group failing traces (badcases) into clusters by embedding similarity, label each cluster with a failure "
             "category (wrong_tool, missing_confirmation, hallucinated_info, loop, ...) and rank clusters by frequency x "
@@ -138,6 +148,8 @@ One call: `python scripts/run.py --db <store.db> --min-cluster-size 3`
     "sparkjury-report": dict(
         cmd="report",
         mode="report",
+        data='Reads the local SQLite store and writes `card.json` / `card.md` / `card.html` under `runs/<run_id>/card/`. No model is called.',
+        network='None.',
         desc=(
             "Produce the SparkJury evidence card for a store: totals, environment failures, pass^1 and pass^k, judge "
             "agreement, degraded decisions, ranked failure clusters with representative evidence and judge opinions, and "
@@ -166,6 +178,8 @@ One call: `python scripts/run.py --db <store.db> --out runs/card`
     "sparkjury-regress": dict(
         cmd="regress",
         mode="regress",
+        data='Reads two local SQLite stores (before / after) and computes pass^k. No model is called.',
+        network='None.',
         desc=(
             "Compare two SparkJury evaluation stores (before and after a prompt or tool change): pass^1 and pass^k deltas, "
             "tasks fixed or broken, per-dimension mean score changes, cluster label shifts, and optional order-swapped "
@@ -239,11 +253,16 @@ def main(argv: list[str]) -> int:
         rc = cli("score", *argv)
         if rc:
             return rc
-        keep, skip = [], {"--dims", "--limit", "--workers"}
+        # arbitrate 只认 score 打完后的分歧，score 专属选项不能透传：
+        # 带值的跳两格，布尔开关跳一格（按两格跳会吞掉后面的参数）。
+        keep, skip2, skip1 = [], {"--dims", "--limit", "--workers", "--evalset"}, {"--allow-self-judge"}
         i = 0
         while i < len(argv):
-            if argv[i] in skip:
+            if argv[i] in skip2:
                 i += 2
+                continue
+            if argv[i] in skip1:
+                i += 1
                 continue
             keep.append(argv[i])
             i += 1
@@ -276,8 +295,8 @@ CARD = """# Skill card: {name}
 | Product | SparkJury agent evaluation harness |
 | Underlying command | `sparkjury {cmd}` |
 | Risk level | {risk} |
-| Data handling | Reads local trace files / SQLite stores only. Sends transcript excerpts to configured judge endpoints (local vLLM by default) and, when `TYPESAFE_API_KEY` is set, disagreement summaries to the Jev cloud API. Nothing else leaves the machine. |
-| Network | Optional: StepFun / Jev / vLLM endpoints as configured |
+| Data handling | {data} |
+| Network | {network} |
 | Side effects | Writes to the given SQLite store and `runs/<run_id>/` |
 | Evaluation dataset | `../../data/samples/` (tau2 + OTel samples), `../../tests/` |
 | Signature | `skill.oms.sig` to be produced with `model_signing` before publishing (see `../../scripts/sign_skills.sh`) |
@@ -326,7 +345,8 @@ def main(argv: list[str]) -> int:
         (d / "SKILL.md").write_text(skill_md, encoding="utf-8")
         (d / "scripts" / "run.py").write_text(RUN_PY.replace("__MODE__", s["mode"]), encoding="utf-8")
         risk = "read/write (local files)" if name == "sparkjury-report" else "write (local store)"
-        (d / "skill-card.md").write_text(CARD.format(name=name, cmd=s["cmd"], risk=risk), encoding="utf-8")
+        (d / "skill-card.md").write_text(CARD.format(name=name, cmd=s["cmd"], risk=risk,
+                                             data=s["data"], network=s["network"]), encoding="utf-8")
     print(f"wrote {len(SKILLS)} skills to {ROOT}")
     return 0
 

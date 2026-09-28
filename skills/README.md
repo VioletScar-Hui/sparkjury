@@ -32,6 +32,23 @@ Each directory contains:
 | `sparkjury-report` | 无 | 卡片内容全部由库里已有的分数算出来 |
 | `sparkjury-regress` | 无 | pass^k 从库里算 |
 
+## 本地端点路由表（8001–8004）
+
+上一张表是「技能 → 模型」，这一张是反方向：**节点上四个本地端点各自被谁消费、断了退到哪**。
+端口与模型的真源是 `deploy/dgx/common.sh`（`JUDGE_A_PORT` 等五个变量），`scripts/certificate.py`
+按它逐行核对本表，改一处不改另一处会红。
+
+| 端点 | 模型（common.sh 默认） | 谁在用 | 端点不可达时 |
+|---|---|---|---|
+| `127.0.0.1:8001` | `Qwen/Qwen3-30B-A3B-Instruct-2507-FP8` | `sparkjury-score`（Judge A）；Jev 缺 key 时兼本地仲裁人 | harness 健康检查后摘掉或换 mock，记降级 |
+| `127.0.0.1:8002` | `nvidia/Nemotron-3.5-Lightning-30B-A3B-NVFP4` | `sparkjury-score`（Judge B） | 同上 |
+| `127.0.0.1:8003` | `Qwen/Qwen3-Embedding-0.6B` | `sparkjury-cluster`（badcase 向量化） | 退回离线哈希向量，输出里标 `hashing-512` |
+| `127.0.0.1:8004` | `Qwen/Qwen3-8B` | 被测 Agent 本体；`sparkjury agent`（M13）默认的调技能模型 | 不影响评测已有 trace；agent 模式无法运行 |
+| 云端（无本地端口） | StepFun `step-3.7-flash` / TypeSafe Jev | `sparkjury-score`（Judge C / 仲裁）、`sparkjury-cluster`（簇标签） | 缺 key 分别退 mock / 本地仲裁 / 启发式标签，全部记降级 |
+
+8004 上的模型是**被测对象**：它不得坐上裁判席——`sparkjury score` 会拒绝裁判模型与库中
+`agent_model` 相同的面板（`--allow-self-judge` 是显式逃生口，用了会在 stderr 大声标注）。
+
 这是「技能 → 模型」的方向。反过来还有一层：`src/sparkjury/agent/`（M13）里模型是**调用方**，
 它自己决定调哪个技能——工具表里有 `load_skill`（读说明书）和 `run_skill`（执行技能），
 跑的时候用哪个模型由 `--model` 决定（节点上默认 `subject`，也就是 8004 上的 Qwen3-8B）。

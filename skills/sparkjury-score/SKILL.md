@@ -18,7 +18,8 @@ metadata:
 
 ## Steps
 1. Choose judges: `mock` (offline) or a panel TOML (see `deploy/judges.example.toml`; keys come from env vars such as `STEPFUN_API_KEY`).
-2. Score: `sparkjury score --db <store.db> --judges mock|<panel.toml> [--dims outcome,tool_use,efficiency,safety] [--limit N]`
+2. Score: `sparkjury score --db <store.db> --judges mock|<panel.toml> [--evalset runs/<id>/evalset.json] [--dims outcome,tool_use,efficiency,safety] [--limit N]`
+   `--evalset` judges exactly the trace ids `sparkjury-evalset` fixed and nothing else; an evalset matching no scorable trace exits non-zero instead of silently scoring nothing.
 3. Arbitrate: `sparkjury arbitrate --db <store.db> --judges mock|<panel.toml> [--jev auto|off] [--audit-rate 0.05]`
    (`TYPESAFE_API_KEY` enables Jev; without it every disagreement is resolved locally and flagged degraded)
 4. Inspect one trace: `sparkjury verdicts <trace_id> --db <store.db>`
@@ -33,7 +34,7 @@ One call: `python scripts/run.py --db <store.db> --judges mock`
 
 ## Edge cases
 - Judges that fail their health check are swapped for mock judges by the harness (`sparkjury run`), never silently.
-- The agent under test's own model must not sit on the panel.
+- The agent under test's own model must not sit on the panel — enforced: `score` refuses such a panel (a model grading itself is not a judge) unless `--allow-self-judge` is passed explicitly.
 
 ## References
 - Architecture and data contracts: `../../docs/ARCHITECTURE.md`

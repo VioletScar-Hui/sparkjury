@@ -22,6 +22,7 @@ metadata:
    `sparkjury run --config <run.toml> --stages EVALSET` (set `[evalset] limit` / `task_ids` in the TOML), or
    `python scripts/run.py --db <store.db> --run-id <id> [--limit N] [--task-ids a,b]`
 3. The stage writes `runs/<run_id>/evalset.json` (list of trace ids) and records `n_traces`, `n_tasks` in the manifest.
+4. Hand the file to scoring: `sparkjury score --evalset runs/<run_id>/evalset.json ...` judges exactly these ids (standalone `score` without it judges every scorable trace).
 
 ## Output
 - `runs/<run_id>/evalset.json`
